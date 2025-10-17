@@ -460,7 +460,7 @@ const moves = {
       piece: { ...piece },
       captured: move.captures.map(cap => {
         const cp = state.game.board[cap.l][cap.r][cap.c];
-        return cp ? { ...cp, l: cap.l, r: cap.r, c: cap.c } : null;
+        return cp ? { color: cp.c, king: cp.king, l: cap.l, r: cap.r, c: cap.c } : null;
       }).filter(Boolean)
     };
     state.game.moveHistory.push(undoEntry);
@@ -549,7 +549,7 @@ const moves = {
       capMesh.position.set(cap.c, cap.l * CONFIG.BOARD.GAP + 0.15, cap.r);
       capMesh.userData.boardCoord = { l: cap.l, r: cap.r, c: cap.c };
       scene.add(capMesh);
-      state.game.board[cap.l][cap.r][cap.c] = { c: cap.c, king: cap.king };
+      state.game.board[cap.l][cap.r][cap.c] = { c: cap.color, king: cap.king };
       if (cap.king) pieces.addKingBand(capMesh);
       state.scene.pieceMeshes[utils.getPieceMeshKey(cap.l, cap.r, cap.c)] = capMesh;
     });
@@ -1127,5 +1127,6 @@ animate();
 </script>
 </body>
 </html>
+
 
 
