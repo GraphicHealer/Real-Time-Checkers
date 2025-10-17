@@ -544,7 +544,7 @@ const moves = {
     
     // Restore captured pieces
     last.captured.forEach(cap => {
-      const material = cap.c === 'r' ? materials.red : materials.black;
+      const material = cap.color === 'r' ? materials.red : materials.black;
       const capMesh = new THREE.Mesh(geometries.piece, material);
       capMesh.position.set(cap.c, cap.l * CONFIG.BOARD.GAP + 0.15, cap.r);
       capMesh.userData.boardCoord = { l: cap.l, r: cap.r, c: cap.c };
@@ -1127,6 +1127,3 @@ animate();
 </script>
 </body>
 </html>
-
-
-
