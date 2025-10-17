@@ -79,7 +79,7 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
     <h2>3D Checkers</h2>
     <div class="stat-item" id="localName"></div>
     <div class="stat-item" id="remoteName"></div>
-    <div class="stat-item">Color: <strong id="playerColor">-</strong></div>
+    <div class="stat-item" id="playerColorBox">Color: <strong id="playerColor">-</strong></div>
     <div class="stat-item" id="gameIdDisplay"></div>
     <div class="stat-item" id="turnDisplay">Turn: Red</div>
     <div class="stat-item" id="redCount">Red: 0</div>
@@ -185,6 +185,7 @@ const dom = {
   redCount: document.getElementById('redCount'),
   blackCount: document.getElementById('blackCount'),
   playerColor: document.getElementById('playerColor'),
+  playerColorBox: document.getElementById('playerColorBox'),
   localName: document.getElementById('localName'),
   remoteName: document.getElementById('remoteName'),
   gameIdDisplay: document.getElementById('gameIdDisplay'),
@@ -1032,7 +1033,7 @@ window.addEventListener('resize', () => {
 dom.buttons.local.addEventListener('click', () => {
   utils.hideAllModals();
   dom.undoBtn.style.display = 'block';
-  dom.playerColor.style.display = 'none';
+  dom.playerColorBox.style.display = 'none';
   dom.gameIdDisplay.style.display = 'none';
   dom.remoteName.style.display = 'none';
   dom.localName.style.display = 'none';
@@ -1128,4 +1129,5 @@ animate();
 </script>
 </body>
 </html>
+
 
