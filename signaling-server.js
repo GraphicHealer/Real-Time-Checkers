@@ -2,16 +2,78 @@
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
-const wss = new WebSocketServer({ port: PORT });
-
-console.log(`✅ Signaling server running on ws://localhost:${PORT}`);
+const http = require('http');
 
 // ==================== STATE ====================
 const state = {
   rooms: new Map(), // roomId -> { players: [ws1, ws2], metadata }
   waitingPlayers: [], // Queue for public matchmaking
+  totalGamesPlayed: 0,
+  totalPlayersJoined: 0,
   cleanupInterval: null
 };
+
+// Create an HTTP server
+const server = http.createServer((req, res) => {
+  // Redirect to HTTPS if not already
+  if (req.headers['x-forwarded-proto'] !== 'https') {
+    const host = req.headers.host;
+    res.writeHead(301, { Location: `https://${host}${req.url}` });
+    res.end();
+    return; // Stop processing the request
+  }
+  
+  if (req.url === '/' || req.url === '/stats') {
+    // Serve a simple stats page
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(`
+      <html>
+        <head>
+          <title>Game Stats</title>
+        </head>
+        <body>
+          <h1>Game Statistics</h1>
+          <ul>
+            <li>Active rooms: <span id="activeRooms">${state.rooms.size}</span></li>
+            <li>Waiting players: <span id="waitingPlayers">${state.waitingPlayers.length}</span></li>
+            <li>Total games played: <span id="totalGames">${state.totalGamesPlayed}</span></li>
+            <li>Total players joined: <span id="totalPlayers">${state.totalPlayersJoined}</span></li>
+          </ul>
+          <script>
+            async function updateStats() {
+              const res = await fetch('/stats.json');
+              const data = await res.json();
+              document.getElementById('activeRooms').textContent = data.activeRooms;
+              document.getElementById('waitingPlayers').textContent = data.waitingPlayers;
+              document.getElementById('totalGames').textContent = data.totalGamesPlayed;
+              document.getElementById('totalPlayers').textContent = data.totalPlayersJoined;
+            }
+            setInterval(updateStats, 5000);
+          </script>
+        </body>
+      </html>
+    `);
+  } else if (req.url === '/stats.json') {
+    // JSON endpoint for stats
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      activeRooms: state.rooms.size,
+      waitingPlayers: state.waitingPlayers.length,
+      totalGamesPlayed: state.totalGamesPlayed,
+      totalPlayersJoined: state.totalPlayersJoined
+    }));
+  } else {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+});
+
+// Pass the HTTP server to WebSocketServer
+const wss = new WebSocketServer({ server });
+
+server.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});
 
 // ==================== UTILITIES ====================
 const utils = {
@@ -237,6 +299,8 @@ const gameActions = {
       room.ready.p1 = false;
       room.ready.p2 = false;
       
+      state.totalGamesPlayed++;
+      
       // Notify both players to start new game
       utils.broadcastToRoom(roomId, { type: 'startNewGame', reqId: requestId });
       
@@ -338,6 +402,7 @@ const handlers = {
 // ==================== CONNECTION HANDLING ====================
 wss.on('connection', (ws) => {
   console.log('🔌 New client connected');
+  state.totalPlayersJoined++;
   
   ws.on('message', (msg) => {
     let data;
