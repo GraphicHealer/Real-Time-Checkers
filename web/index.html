@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Extra-Dimensional Real-Time-Checkers</title>
-<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link id="favicon" rel="icon" type="image/png" href="">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -426,6 +426,84 @@ const utils = {
   
   hideAllModals() {
     Object.values(dom.modals).forEach(m => m.classList.remove('active'));
+  },
+  
+  setFavicon(color, isWinner = false) {
+    const canvas = document.createElement("canvas");
+    const size = 64;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    // --- Checker geometry ---
+    const topY = 18;
+    const height = 18;
+    const radiusX = 24;
+    const radiusY = 10;
+
+    // --- Base colors ---
+    const baseColor = color === "red" || color === "#ff4b4b" ? "#c62828" : "#111";
+    const sideColor = color === "red" || color === "#ff4b4b" ? "#8b1a1a" : "#000";
+    const edgeHighlight = color === "red" || color === "#ff4b4b" ? "#ff6b6b" : "#444";
+
+    // --- Shadow below the piece ---
+    ctx.beginPath();
+    ctx.ellipse(size / 2, topY + height + 6, radiusX, radiusY * 0.8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fill();
+
+    // --- Side gradient ---
+    const gradient = ctx.createLinearGradient(0, topY, 0, topY + height);
+    gradient.addColorStop(0, baseColor);
+    gradient.addColorStop(1, sideColor);
+
+    ctx.beginPath();
+    ctx.ellipse(size / 2, topY, radiusX, radiusY, 0, Math.PI, 0, true); // hidden top arc
+    ctx.ellipse(size / 2, topY + height, radiusX, radiusY, 0, 0, Math.PI, false); // bottom arc
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // --- Top face ---
+    const topGrad = ctx.createRadialGradient(
+      size * 0.45, topY - 2, 2,
+      size / 2, topY, radiusX
+    );
+    topGrad.addColorStop(0, edgeHighlight);
+    topGrad.addColorStop(1, baseColor);
+
+    ctx.beginPath();
+    ctx.ellipse(size / 2, topY, radiusX, radiusY, 0, 0, Math.PI * 2);
+    ctx.fillStyle = topGrad;
+    ctx.fill();
+    ctx.strokeStyle = "#888";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // --- Optional rim highlight ---
+    ctx.beginPath();
+    ctx.ellipse(size / 2, topY - 1, radiusX * 0.9, radiusY * 0.8, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // --- Winner gold ring overlay ---
+    if (isWinner) {
+      const ringGrad = ctx.createLinearGradient(0, 0, 0, size);
+      ringGrad.addColorStop(0, "#ffd700");
+      ringGrad.addColorStop(0.5, "#ffec8b");
+      ringGrad.addColorStop(1, "#b8860b");
+
+      ctx.beginPath();
+      ctx.ellipse(size / 2, topY, radiusX + 3, radiusY + 3, 0, 0, Math.PI * 2);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = ringGrad;
+      ctx.stroke();
+    }
+
+    // --- Apply favicon ---
+    const favicon = document.getElementById("favicon");
+    favicon.href = canvas.toDataURL("image/png");
   }
 };
 
@@ -801,6 +879,12 @@ const game = {
       text = winner === 'r' ? "Red Wins!" : "Black Wins!";
     }
     
+    if (winner === 'r') {
+      utils.setFavicon('red', true);
+    } else {
+      utils.setFavicon('black', true);
+    }
+    
     dom.winText.textContent = text;
     utils.showModal('win');
     dom.undoBtn.style.display = 'none';
@@ -832,6 +916,12 @@ const ui = {
     // Highlight the active player
     dom.redProfile.classList.toggle('active', state.game.currentPlayer === 'r');
     dom.blackProfile.classList.toggle('active', state.game.currentPlayer === 'b');
+    
+    if (state.game.currentPlayer === 'r') {
+      utils.setFavicon('red');
+    } else {
+      utils.setFavicon('black');
+    }
   },
   
   resetNewGameButtons() {
@@ -1165,6 +1255,10 @@ window.addEventListener('resize', () => {
   camera.aspect = dom.viewport.clientWidth / dom.viewport.clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(dom.viewport.clientWidth, dom.viewport.clientHeight);
+});
+
+window.addEventListener('load', () => {
+  utils.setFavicon(state.game?.currentPlayer === 'b' ? 'black' : 'red');
 });
 
 // Menu buttons
