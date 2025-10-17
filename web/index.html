@@ -1076,6 +1076,10 @@ dom.buttons.createPrivate.addEventListener('click', () => {
   const joinUrl = `${window.location.origin}${window.location.pathname}?room=${id}`;
   
   dom.waitingCode.innerHTML = `
+    Join Code:<br><br>
+    <span style="font-size: 20px; padding: 8px 12px; border-radius: 4px; background: #2a2a2a;">
+      ${id}
+    </span><br><br>
     Invite URL (Click to Copy):<br><br>
     <span id="copyLink" 
           style="padding: 8px 12px; border-radius: 4px; background: #2a2a2a; color:#4a90e2; cursor:pointer; text-decoration:underline;">
