@@ -1067,7 +1067,7 @@ dom.buttons.createPrivate.addEventListener('click', () => {
   if (!name) return alert('Please enter a Name/Handle');
   state.player.displayName = name;
   const id = Math.random().toString(36).substring(2, 8);
-  dom.gameIdDisplay.textContent = `Game ID: ${id}`;
+  dom.gameIdDisplay.style.display = `Game ID: ${id}`;
   dom.waitingCode.textContent = `Game ID: ${id}`;
   utils.showModal('waiting');
   network.connectWebSocket();
@@ -1127,5 +1127,3 @@ animate();
 </script>
 </body>
 </html>
-
-
