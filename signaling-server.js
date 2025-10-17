@@ -306,12 +306,12 @@ const handlers = {
     const room = state.rooms.get(roomId);
     
     if (!room) {
-      utils.send(ws, { type: 'error', message: 'Room not found' });
+      utils.send(ws, { type: 'roomInvalid', roomId });
       return;
     }
     
     if (room.players.length >= 2) {
-      utils.send(ws, { type: 'error', message: 'Room is full' });
+      utils.send(ws, { type: 'roomFull', roomId });
       return;
     }
     
