@@ -2,27 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3D Checkers - WebRTC Multiplayer</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <style>
-body { margin:0; overflow:hidden; font-family:sans-serif; }
-#container { display:flex; height:100vh; }
-#viewport { flex:1; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
+
+#container { display: flex; height: 100vh; }
+#viewport { flex: 1; position: relative; }
 #sidebar {
-    width:250px;
-    background:#2a2a2a;
-    color:white;
-    padding:10px;
-    box-sizing:border-box;
-    position:relative;
+    width: 260px;
+    background: #2a2a2a;
+    color: white;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
-button { width:100%; padding:8px; margin-top:10px; font-size:16px; cursor:pointer; }
-#startupMenu, #webrtcMenu, #waitingScreen, #disconnectedScreen, #winScreen {
-    position:absolute; top:0; left:0; width:100%; height:100%;
-    background:rgba(0,0,0,0.9); display:flex; flex-direction:column;
-    justify-content:center; align-items:center; z-index:10;
+#waitingCode {
+    color:#ccc;
+    font-size:18px;
+    margin-top:-10px;
 }
-#startupMenu button, #webrtcMenu button { width:200px; margin:10px; padding:15px; font-size:18px; }
+
+.stat-item { 
+    padding: 8px 12px; 
+    background: rgba(255,255,255,0.05); 
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    background: #4a90e2;
+    color: white;
+    transition: background 0.2s;
+}
+button:hover:not(:disabled) { background: #357abd; }
+button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    gap: 20px;
+}
+.modal.active { display: flex; }
+.modal h1 { color: white; font-size: 32px; margin-bottom: 10px; }
+.modal button { width: 220px; }
+.modal input {
+    width: 220px;
+    padding: 12px;
+    font-size: 15px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #333;
+    color: white;
+}
 </style>
 </head>
 <body>
@@ -30,41 +77,47 @@ button { width:100%; padding:8px; margin-top:10px; font-size:16px; cursor:pointe
   <div id="viewport"></div>
   <div id="sidebar">
     <h2>3D Checkers</h2>
-    <p>Your Color: <span id="playerColor"></span></p>
-    <p id="gameIdDisplay"></p>
-    <p id="turn">Turn: Red</p>
-    <p id="redCount">Red Pieces: 0</p>
-    <p id="blackCount">Black Pieces: 0</p>
+    <div class="stat-item" id="localName"></div>
+    <div class="stat-item" id="remoteName"></div>
+    <div class="stat-item">Color: <strong id="playerColor">-</strong></div>
+    <div class="stat-item" id="gameIdDisplay"></div>
+    <div class="stat-item" id="turnDisplay">Turn: Red</div>
+    <div class="stat-item" id="redCount">Red: 0</div>
+    <div class="stat-item" id="blackCount">Black: 0</div>
     <button id="newGameBtn">New Game</button>
-    <button id="undoBtn">Undo</button>
+    <button id="undoBtn">Undo Move</button>
   </div>
 </div>
 
-<!-- Menus -->
-<div id="startupMenu">
-  <h1 style="color:white;margin-bottom:30px;">Choose Game Mode</h1>
+<!-- Modals -->
+<div id="startupModal" class="modal active">
+  <h1>3D Checkers</h1>
   <button id="localBtn">Local Multiplayer</button>
-  <button id="webrtcBtn">WebRTC Multiplayer</button>
+  <button id="webrtcBtn">Online Multiplayer</button>
 </div>
 
-<div id="webrtcMenu" style="display:none;">
-  <h1 style="color:white;margin-bottom:30px;">WebRTC Multiplayer</h1>
-  <button id="publicBtn">Play Public Game</button>
+<div id="webrtcModal" class="modal">
+  <h1>Online Mode</h1>
+  <input id="displayName" placeholder="Enter a Name/Handle">
+  <button id="publicBtn">Find Public Game</button>
   <button id="createPrivateBtn">Create Private Game</button>
-  <input id="privateGameId" placeholder="Enter Game ID" style="margin-top:5px;">
+  <input id="privateGameId" placeholder="Enter Private Game ID">
   <button id="joinPrivateBtn">Join Private Game</button>
+  <button id="backBtn">Back</button>
 </div>
 
-<div id="waitingScreen" style="display:none;">
-  <h1 style="color:white;margin-bottom:30px;">Waiting for opponent...</h1>
+<div id="waitingModal" class="modal">
+  <h1>Waiting for opponent...</h1>
+  <p id="waitingCode"></p>
 </div>
 
-<div id="disconnectedScreen" style="display:none;">
-  <h1 style="color:white;margin-bottom:30px;">Your opponent disconnected</h1>
+<div id="disconnectedModal" class="modal">
+  <h1>Opponent Disconnected</h1>
+  <p style="color:#ccc">Returning to menu in 5 seconds...</p>
 </div>
 
-<div id="winScreen" style="display:none;">
-  <h1 style="color:white;margin-bottom:30px;" id="winText">Player X Wins!</h1>
+<div id="winModal" class="modal">
+  <h1 id="winText">Game Over</h1>
   <button id="winNewGameBtn">New Game</button>
   <button id="winMainMenuBtn">Main Menu</button>
 </div>
@@ -73,774 +126,1003 @@ button { width:100%; padding:8px; margin-top:10px; font-size:16px; cursor:pointe
 import * as THREE from './three/three.module.js';
 import { OrbitControls } from './three/OrbitControls.js';
 
-const viewport = document.getElementById("viewport");
-const turnDisplay = document.getElementById("turn");
-const redCountDisplay = document.getElementById("redCount");
-const blackCountDisplay = document.getElementById("blackCount");
-const newGameBtn = document.getElementById("newGameBtn");
-const undoBtn = document.getElementById("undoBtn");
+// ==================== CONSTANTS ====================
+const CONFIG = {
+  BOARD: { LAYERS: 3, SIZE: 8, TILE_SIZE: 1, GAP: 1.5 },
+  COLORS: { 
+    DARK_TILE: 0x222222, 
+    LIGHT_TILE: 0x888888,
+    RED: 0xaa0000,
+    BLACK: 0x000000,
+    GOLD: 0xffd700,
+    HIGHLIGHT: 0x0000ff,
+    VALID_MOVE: 0x00ff00
+  },
+  //WS_URL: 'wss://rtcheckers.graphichealer.com'
+  WS_URL: 'ws://localhost:3000'
+};
 
-// Menus
-const startupMenu = document.getElementById('startupMenu');
-const localBtn = document.getElementById('localBtn');
-const webrtcBtn = document.getElementById('webrtcBtn');
-const webrtcMenu = document.getElementById('webrtcMenu');
-const waitingScreen = document.getElementById('waitingScreen');
-const disconnectedScreen = document.getElementById('disconnectedScreen');
-const playerColorDisplay = document.getElementById('playerColor');
-const publicBtn = document.getElementById('publicBtn');
-const createPrivateBtn = document.getElementById('createPrivateBtn');
-const joinPrivateBtn = document.getElementById('joinPrivateBtn');
-const privateGameIdInput = document.getElementById('privateGameId');
-const gameIdDisplay = document.getElementById('gameIdDisplay');
-const winScreen = document.getElementById('winScreen');
-const winText = document.getElementById('winText');
-const winNewGameBtn = document.getElementById('winNewGameBtn');
-const winMainMenuBtn = document.getElementById('winMainMenuBtn');
+// ==================== STATE ====================
+const state = {
+  game: {
+    board: [],
+    currentPlayer: 'r',
+    selectedPiece: null,
+    mustContinueJump: false,
+    moveHistory: [],
+    isMultiplayer: false,
+    myColor: 'r'
+  },
+  network: {
+    ws: null,
+    pc: null,
+    dataChannel: null,
+    dataChannelReady: false,
+    dataChannelQueue: [],
+    pendingIceCandidates: [],
+    isCaller: false,
+    roomId: null,
+    lastNewGameReqId: null,
+    isRespondingToNewGame: false,
+    isAutoResetting: false
+  },
+  player: {
+    displayName: "",
+    opponentName: ""
+  },
+  scene: {
+    boardMeshes: [],
+    pieceMeshes: {},
+    outlineMesh: null,
+    virtualMoves: []
+  }
+};
 
-let isMultiplayer = false;
-let myColor = 'r';
-let pc = null;
-let ws = null;
-let dataChannel = null;
-let dataChannelQueue = []; // <-- queue moves until DataChannel is open
-let dataChannelReady = false;
-let isCaller = false;
-let roomId = null;
-let pendingCandidates = []; // <-- queue ICE candidates until remoteDescription set
+// ==================== DOM REFERENCES ====================
+const dom = {
+  viewport: document.getElementById('viewport'),
+  turnDisplay: document.getElementById('turnDisplay'),
+  redCount: document.getElementById('redCount'),
+  blackCount: document.getElementById('blackCount'),
+  playerColor: document.getElementById('playerColor'),
+  localName: document.getElementById('localName'),
+  remoteName: document.getElementById('remoteName'),
+  gameIdDisplay: document.getElementById('gameIdDisplay'),
+  newGameBtn: document.getElementById('newGameBtn'),
+  undoBtn: document.getElementById('undoBtn'),
+  waitingCode: document.getElementById('waitingCode'),
+  
+  modals: {
+    startup: document.getElementById('startupModal'),
+    webrtc: document.getElementById('webrtcModal'),
+    waiting: document.getElementById('waitingModal'),
+    disconnected: document.getElementById('disconnectedModal'),
+    win: document.getElementById('winModal')
+  },
+  
+  buttons: {
+    local: document.getElementById('localBtn'),
+    webrtc: document.getElementById('webrtcBtn'),
+    displayName: document.getElementById('displayName'),
+    public: document.getElementById('publicBtn'),
+    createPrivate: document.getElementById('createPrivateBtn'),
+    joinPrivate: document.getElementById('joinPrivateBtn'),
+    privateInput: document.getElementById('privateGameId'),
+    back: document.getElementById('backBtn'),
+    winNewGame: document.getElementById('winNewGameBtn'),
+    winMainMenu: document.getElementById('winMainMenuBtn')
+  },
+  
+  winText: document.getElementById('winText')
+};
 
-// THREE.js setup
+// ==================== THREE.JS SETUP ====================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202020);
-const camera = new THREE.PerspectiveCamera(60, viewport.clientWidth/viewport.clientHeight, 0.1, 1000);
-camera.position.set(8,12,16);
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-viewport.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(
+  60, 
+  dom.viewport.clientWidth / dom.viewport.clientHeight, 
+  0.1, 
+  1000
+);
+camera.position.set(8, 12, 16);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(dom.viewport.clientWidth, dom.viewport.clientHeight);
+dom.viewport.appendChild(renderer.domElement);
+
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.target.set(3.5,0,3.5);
+controls.target.set(3.5, 0, 3.5);
 controls.update();
-scene.add(new THREE.AmbientLight(0xffffff,0.5));
-const dirLight = new THREE.DirectionalLight(0xffffff,0.8);
-dirLight.position.set(10,20,10);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 20, 10);
 scene.add(dirLight);
 
-// Board & pieces
-const layers = 3, gap = 1.5, size = 1;
-const darkColor = 0x222222, lightColor = 0x888888;
-const boardMeshes = [];
-let board = [];
-const pieceGeo = new THREE.CylinderGeometry(0.4,0.4,0.2,32);
-const redMat = new THREE.MeshPhongMaterial({color:0xaa0000});
-const blkMat = new THREE.MeshPhongMaterial({color:0x000000});
-const goldMat = new THREE.MeshPhongMaterial({color:0xFFD700});
-let pieceMeshes = {};
-let currentPlayer = 'r';
-let selected = null;
-let outlineMesh = null;
-let virtualMoves = [];
-let mustContinueJump = false;
-let moveHistory = [];
+// Shared geometries and materials
+const geometries = {
+  piece: new THREE.CylinderGeometry(0.4, 0.4, 0.2, 32),
+  tile: new THREE.BoxGeometry(CONFIG.BOARD.TILE_SIZE, 0.1, CONFIG.BOARD.TILE_SIZE),
+  kingBand: new THREE.TorusGeometry(0.25, 0.03, 16, 100),
+  validMove: new THREE.CylinderGeometry(0.35, 0.35, 0.15, 32)
+};
 
-// --- Board Functions ---
-function createBoard() {
-    board = [];
-    boardMeshes.forEach(m=>{
-        scene.remove(m);
-        m.geometry.dispose();
-        m.material.dispose();
-    });
-    boardMeshes.length=0;
-    for(let l=0;l<layers;l++){
-        const layerArr=[];
-        for(let r=0;r<8;r++){
-            const rowArr=[];
-            for(let c=0;c<8;c++){
-                const isDark=(r+c+l)%2===0;
-                const cube=new THREE.Mesh(new THREE.BoxGeometry(size,0.1,size),
-                    new THREE.MeshPhongMaterial({color:isDark?darkColor:lightColor,transparent:true,opacity:0.7}));
-                cube.position.set(c,l*gap,r);
-                cube.userData={boardCoord:{l,r,c}};
-                scene.add(cube);
-                boardMeshes.push(cube);
-                rowArr.push(null);
-            }
-            layerArr.push(rowArr);
-        }
-        board.push(layerArr);
-    }
-}
+const materials = {
+  red: new THREE.MeshPhongMaterial({ color: CONFIG.COLORS.RED }),
+  black: new THREE.MeshPhongMaterial({ color: CONFIG.COLORS.BLACK }),
+  gold: new THREE.MeshPhongMaterial({ color: CONFIG.COLORS.GOLD }),
+  validMove: new THREE.MeshPhongMaterial({ 
+    color: CONFIG.COLORS.VALID_MOVE, 
+    transparent: true, 
+    opacity: 0.5 
+  })
+};
 
-function createKingBand(pieceMesh){
-    const bandGeo=new THREE.TorusGeometry(0.25,0.03,16,100);
-    const band=new THREE.Mesh(bandGeo,goldMat);
-    band.rotation.x=Math.PI/2;
-    band.position.y=0.1;
-    pieceMesh.add(band);
-    pieceMesh.userData.kingBand=band;
-}
+// ==================== UTILITY FUNCTIONS ====================
+const utils = {
+  inBounds(l, r, c) {
+    return l >= 0 && l < CONFIG.BOARD.LAYERS && 
+           r >= 0 && r < CONFIG.BOARD.SIZE && 
+           c >= 0 && c < CONFIG.BOARD.SIZE;
+  },
+  
+  isValidTile(l, r, c) {
+    return (l + r + c) % 2 === 0;
+  },
+  
+  getPieceMeshKey(l, r, c) {
+    return `${l}_${r}_${c}`;
+  },
+  
+  showModal(modalName) {
+    Object.values(dom.modals).forEach(m => m.classList.remove('active'));
+    dom.modals[modalName]?.classList.add('active');
+  },
+  
+  hideAllModals() {
+    Object.values(dom.modals).forEach(m => m.classList.remove('active'));
+  }
+};
 
-function removeKingBand(pieceMesh){
-    if(pieceMesh.userData.kingBand){
-        pieceMesh.remove(pieceMesh.userData.kingBand);
-        pieceMesh.userData.kingBand.geometry.dispose();
-        pieceMesh.userData.kingBand.material.dispose();
-        pieceMesh.userData.kingBand=null;
-    }
-}
-
-// --- Pieces ---
-function setupPieces(){
-    pieceMeshes={};
-    scene.children.forEach(obj=>{
-        if(obj.userData && obj.userData.boardCoord && obj.geometry.type==="CylinderGeometry"){
-            scene.remove(obj); obj.geometry.dispose(); obj.material.dispose();
-        }
-    });
-    // Red pieces (caller)
-    for(let r=5;r<8;r++){for(let c=0;c<8;c++){
-        if((r+c+2)%2===0){
-            const mesh=new THREE.Mesh(pieceGeo, redMat);
-            mesh.position.set(c,layers*gap-gap+0.15,r);
-            scene.add(mesh);
-            board[layers-1][r][c]={c:'r', king:false};
-            mesh.userData.boardCoord={l:layers-1,r,c};
-            pieceMeshes[`${layers-1}_${r}_${c}`]=mesh;
-        }
-    }}
-    // Black pieces (guest)
-    for(let r=0;r<3;r++){for(let c=0;c<8;c++){
-        if((r+c+2)%2===0){
-            const mesh=new THREE.Mesh(pieceGeo, blkMat);
-            mesh.position.set(c,0.15,r);
-            scene.add(mesh);
-            board[0][r][c]={c:'b', king:false};
-            mesh.userData.boardCoord={l:0,r,c};
-            pieceMeshes[`0_${r}_${c}`]=mesh;
-        }
-    }}
-    updateSidebar();
-}
-
-function updateSidebar(){
-    turnDisplay.textContent=`Turn: ${currentPlayer==='r'?'Red':'Black'}`;
-    let redCount=0, blackCount=0;
-    for(let l=0;l<layers;l++) for(let r=0;r<8;r++) for(let c=0;c<8;c++){
-        const p=board[l][r][c]; if(p){if(p.c==='r') redCount++;else blackCount++;}
-    }
-    redCountDisplay.textContent=`Red Pieces: ${redCount}`;
-    blackCountDisplay.textContent=`Black Pieces: ${blackCount}`;
-}
-
-function checkWin(isRemote=false) {
-    let redCount=0, blackCount=0;
-    for(let l=0;l<layers;l++)
-        for(let r=0;r<8;r++)
-            for(let c=0;c<8;c++){
-                const p = board[l][r][c];
-                if(p){ if(p.c==='r') redCount++; else blackCount++; }
-            }
-    updateSidebar();
-
-    if(redCount === 0) {
-        console.log(`Black Win`);
-        showWinScreen('b', isRemote);
-        if(isMultiplayer && dataChannel && dataChannelReady && !isRemote){
-            dataChannel.send(JSON.stringify({ type:'win', winner:'b' }));
-        }
-        return true;
-    }
-
-    if(blackCount === 0) {
-        console.log(`Red Win`);
-        showWinScreen('r', isRemote);
-        if(isMultiplayer && dataChannel && dataChannelReady && !isRemote){
-            dataChannel.send(JSON.stringify({ type:'win', winner:'r' }));
-        }
-        return true;
-    }
-    console.log(`No Win`);
-    return false;
-}
-
-function showWinScreen(winnerColor, isRemote=false) {
-    // Determine text
-    let text;
-    if(isRemote){
-        text = (winnerColor === myColor) ? "You Won!" : "You Lost!";
-    } else {
-        text = winnerColor === 'r' ? "Red Wins!" : "Black Wins!";
-    }
-
-    winText.textContent = text;
-    winScreen.style.display = 'flex';
-    undoBtn.style.display = 'none';
-}
-
-// --- Interaction ---
-const raycaster=new THREE.Raycaster();
-const pointer=new THREE.Vector2();
-function getPieceMesh(l,r,c){ return pieceMeshes[`${l}_${r}_${c}`]; }
-function clearHighlights(){
-    if(outlineMesh){scene.remove(outlineMesh); outlineMesh.geometry.dispose(); outlineMesh.material.dispose(); outlineMesh=null;}
-    virtualMoves.forEach(vm=>{scene.remove(vm); vm.geometry.dispose(); vm.material.dispose();});
-    virtualMoves=[];
-}
-
-// --- Move Logic ---
-function inBounds(l,r,c){ return l>=0&&l<layers&&r>=0&&r<8&&c>=0&&c<8; }
-function getMovesFor(l,r,c,onlyJumps=false){
-    const piece=board[l][r][c]; if(!piece||piece.c!==currentPlayer) return [];
-    const moves=[]; const dlOffsets=[-1,0,1]; const drOffsets=piece.king?[-1,0,1]:[(piece.c==='r'?-1:1),0]; const dcOffsets=[-1,0,1];
-    for(let dl of dlOffsets) for(let dr of drOffsets) for(let dc of dcOffsets){
-        if(dl===0&&dr===0&&dc===0) continue;
-        const nl=l+dl,nr=r+dr,nc=c+dc;
-        if(!inBounds(nl,nr,nc)) continue; if((nl+nr+nc)%2!==0) continue;
-        const target=board[nl][nr][nc];
-        if(!target&&!onlyJumps) moves.push({from:{l,r,c},to:{l:nl,r:nr,c:nc},captures:[]});
-        else if(target && target.c!==piece.c){
-            const jl=nl+dl,jr=nr+dr,jc=nc+dc;
-            if(inBounds(jl,jr,jc) && !board[jl][jr][jc]) moves.push({from:{l,r,c},to:{l:jl,r:jr,c:jc},captures:[{l:nl,r:nr,c:nc}]});
-        }
-    }
-    const jumpMoves=moves.filter(m=>m.captures.length>0);
-    if(jumpMoves.length>0) return jumpMoves;
-    return onlyJumps?[]:moves;
-}
-
-function highlightPiece(l,r,c){
-    clearHighlights();
-    const mesh=getPieceMesh(l,r,c); if(!mesh) return;
-    const edges=new THREE.EdgesGeometry(mesh.geometry);
-    outlineMesh=new THREE.LineSegments(edges,new THREE.LineBasicMaterial({color:0x0000ff,linewidth:2}));
-    outlineMesh.position.copy(mesh.position); outlineMesh.rotation.copy(mesh.rotation);
-    scene.add(outlineMesh);
-    const moves=getMovesFor(l,r,c,mustContinueJump);
-    moves.forEach(m=>{
-        const vm=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.15,32),
-            new THREE.MeshPhongMaterial({color:0x00ff00,transparent:true,opacity:0.5}));
-        vm.position.set(m.to.c,m.to.l*gap+0.15,m.to.r); vm.userData.move=m;
-        scene.add(vm); virtualMoves.push(vm);
-    });
-}
-
-// --- Move / Undo ---
-function movePiece(move, sendToRemote=true, isRemote=false){
-    if(isMultiplayer && !isRemote && currentPlayer !== myColor) return;
-
-    const from = move.from, to = move.to; 
-    const piece = board[from.l][from.r][from.c]; 
-    if(!piece) return;
-
-    // --- save undo ---
-    const undoEntry = { 
-        from:{...from}, 
-        to:{...to}, 
-        piece:{...piece}, 
-        captured: move.captures.map(cap=>{
-            const cp = board[cap.l][cap.r][cap.c]; 
-            return cp ? {...cp, l:cap.l, r:cap.r, cPos:cap.c} : null;
-        }).filter(Boolean)
-    };
-    moveHistory.push(undoEntry);
-
-    // --- king logic ---
-    if(piece.c==='r' && to.l===0 && to.r===0) piece.king=true;
-    if(piece.c==='b' && to.l===layers-1 && to.r===7) piece.king=true;
-
-    const mesh = getPieceMesh(from.l,from.r,from.c);
-    if(piece.king && mesh && !mesh.userData.kingBand) createKingBand(mesh);
-
-    board[to.l][to.r][to.c] = piece; 
-    board[from.l][from.r][from.c] = null;
-
-    // --- remove captured pieces ---
-    move.captures.forEach(cap=>{
-        const cm = getPieceMesh(cap.l,cap.r,cap.c);
-        if(cm){
-            removeKingBand(cm); 
-            scene.remove(cm); 
-            cm.geometry.dispose(); 
-            cm.material.dispose(); 
-            delete pieceMeshes[`${cap.l}_${cap.r}_${cap.c}`]; 
-            board[cap.l][cap.r][cap.c] = null;
-        }
-    });
-
-    // --- move mesh ---
-    if(mesh){
-        mesh.position.set(to.c,to.l*gap+0.15,to.r);
-        mesh.userData.boardCoord = {l:to.l,r:to.r,c:to.c};
-        delete pieceMeshes[`${from.l}_${from.r}_${from.c}`]; 
-        pieceMeshes[`${to.l}_${to.r}_${to.c}`] = mesh;
-    }
-
-    clearHighlights();
-    const furtherJumps = getMovesFor(to.l,to.r,to.c,true);
-    if(furtherJumps.length>0 && move.captures.length>0){
-        mustContinueJump = true; 
-        selected = {l:to.l,r:to.r,c:to.c}; 
-        highlightPiece(to.l,to.r,to.c);
-    } else {
-        mustContinueJump = false; 
-        selected = null; 
-        
-        if(checkWin()) return;
-        
-        // --- flip turn ---
-        currentPlayer = currentPlayer === 'r' ? 'b' : 'r';
-    }
-
-    updateSidebar();
-
-    // --- send move to remote ---
-    if(isMultiplayer && sendToRemote && !isRemote){
-        const payload = { type:'move', move, nextTurn: currentPlayer };
-        const msg = JSON.stringify(payload);
-        if(dataChannel && dataChannelReady){
-            dataChannel.send(msg);
-        } else {
-            dataChannelQueue.push(msg);
-        }
-    }
-}
-
-function undoMove(){
-    if(moveHistory.length===0) return;
-    const last=moveHistory.pop(); 
-    const mesh=getPieceMesh(last.to.l,last.to.r,last.to.c);
-    if(mesh){
-        board[last.from.l][last.from.r][last.from.c]=last.piece; 
-        board[last.to.l][last.to.r][last.to.c]=null;
-        mesh.position.set(last.from.c,last.from.l*gap+0.15,last.from.r); 
-        mesh.userData.boardCoord={...last.from};
-        delete pieceMeshes[`${last.to.l}_${last.to.r}_${last.to.c}`]; 
-        pieceMeshes[`${last.from.l}_${last.from.r}_${last.from.c}`]=mesh;
-        if(last.piece.king) createKingBand(mesh); else removeKingBand(mesh);
-    }
-    last.captured.forEach(cap=>{
-        const capMesh=new THREE.Mesh(pieceGeo, cap.c==='r'?redMat:blkMat);
-        capMesh.position.set(cap.cPos,cap.l*gap+0.15,cap.r); capMesh.userData.boardCoord={l:cap.l,r:cap.r,c:cap.cPos};
-        scene.add(capMesh); board[cap.l][cap.r][cap.cPos]={c:cap.c,king:cap.king};
-        if(cap.king) createKingBand(capMesh);
-        pieceMeshes[`${cap.l}_${cap.r}_${cap.cPos}`]=capMesh;
-    });
-    clearHighlights(); mustContinueJump=false; selected=null; currentPlayer=currentPlayer==='r'?'b':'r';
-    updateSidebar();
-}
-
-// --- Click ---
-function onClick(ev){
-    if(currentPlayer !== myColor) return; // block clicks if not your turn
-    const rect = viewport.getBoundingClientRect();
-    pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(scene.children, true);
-    if(intersects.length === 0) return;
-
-    for(const it of intersects){
-        const obj = it.object;
-        if(obj.userData.move){ 
-            movePiece(obj.userData.move); 
-            return; 
-        }
-        if(obj.userData.boardCoord && (!mustContinueJump || (mustContinueJump && obj.userData.boardCoord.c === selected?.c))){
-            const {l,r,c} = obj.userData.boardCoord; 
-            const piece = board[l][r][c];
-            if(!piece || piece.c !== currentPlayer) return;
-            if(selected && selected.l === l && selected.r === r && selected.c === c){ selected=null; clearHighlights(); }
-            else { selected={l,r,c}; highlightPiece(l,r,c); }
-            return;
-        }
-    }
-}
-
-viewport.addEventListener("pointerdown", onClick);
-window.addEventListener("resize",()=>{ camera.aspect=viewport.clientWidth/viewport.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(viewport.clientWidth,viewport.clientHeight); });
-
-// keep track of the last reqId we sent so we can ignore echoes
-let lastSentNewGameReqId = null;
-let isAutoResetting = false; // 👈 add this global guard
-let isRespondingToNewGame = false;
-
-newGameBtn.addEventListener("click", () => requestNewGame(newGameBtn));
-
-function requestNewGame(button = newGameBtn) { // default to sidebar button
-    if (isAutoResetting) return; // ignore during reset
-
-    if (isRespondingToNewGame) {
-        // Responding to opponent’s request
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "readyForNewGame", roomId }));
-        }
-        button.textContent = "Confirming...";
-        button.disabled = true;
-        button.style.backgroundColor = "#888";
-        isRespondingToNewGame = false;
-        return;
-    }
-
-    // Normal behavior: sending our own new game request
-    if (isMultiplayer && ws && ws.readyState === WebSocket.OPEN) {
-        const reqId = Math.random().toString(36).substring(2,8);
-        lastSentNewGameReqId = reqId;
-
-        ws.send(JSON.stringify({ type: "readyForNewGame", roomId, reqId }));
-
-        button.style.backgroundColor = "#888";
-        button.textContent = "Waiting for opponent...";
-        button.disabled = true;
-    } else {
-        startLocalNewGame();
-    }
-}
-
-function resetNewGameButtons() {
-    [newGameBtn, winNewGameBtn].forEach(btn => {
-        btn.disabled = false;
-        btn.style.backgroundColor = "";
-        btn.textContent = "New Game";
-    });
-}
-
-function startLocalNewGame() {
-    currentPlayer = 'r';
-    mustContinueJump = false;
-    selected = null;
-    moveHistory = [];
-    Object.values(pieceMeshes).forEach(mesh => {
-        removeKingBand(mesh);
-        scene.remove(mesh);
-        mesh.geometry.dispose();
-        mesh.material.dispose();
-    });
-    pieceMeshes = {};
-    clearHighlights();
-    createBoard();
-    setupPieces();
-    newGameBtn.textContent = "New Game";
-    newGameBtn.disabled = false;
-}
-
-function showNewGamePrompt() {
-    newGameBtn.style.backgroundColor = "#d9534f"; // red for alert
-    newGameBtn.textContent = "Opponent wants a new game! Click to confirm?";
-    newGameBtn.disabled = false;
-
-    isRespondingToNewGame = true; // 👈 tell the click handler what this click means
-
-    // Optional timeout safety
-    setTimeout(() => {
-        if (isRespondingToNewGame) {
-            console.log("⚠️ Opponent new game request timed out");
-            isRespondingToNewGame = false;
-            newGameBtn.textContent = "New Game";
-            newGameBtn.style.backgroundColor = "";
-            newGameBtn.disabled = false;
-        }
-    }, 15000);
-}
-
-undoBtn.addEventListener("click", undoMove);
-
-// --- Menus ---
-localBtn.addEventListener('click', ()=>{
-    startupMenu.style.display='none'; undoBtn.style.display='block'; isMultiplayer=false; currentPlayer='r';
-});
-webrtcBtn.addEventListener('click', ()=>{ 
-    startupMenu.style.display='none'; webrtcMenu.style.display='flex'; undoBtn.style.display='none'; 
-    isMultiplayer=true; 
-});
-
-winNewGameBtn.addEventListener('click', () => {
-    winScreen.style.display = 'none';
-    newGameBtn.click();
-    requestNewGame(winNewGameBtn); // uses the same logic as sidebar button
-});
-
-winMainMenuBtn.addEventListener('click', () => {
-    winScreen.style.display = 'none';
-    startupMenu.style.display = 'flex';  // Show main menu
-    undoBtn.style.display = 'block';
+// ==================== BOARD MANAGEMENT ====================
+const board = {
+  create() {
+    state.game.board = [];
     
-    resetNewGameButtons(); // ✅ Reset buttons
-
-    // Reset board pieces for visual consistency
-    Object.values(pieceMeshes).forEach(mesh => {
-        removeKingBand(mesh);
-        scene.remove(mesh);
-        mesh.geometry.dispose();
-        mesh.material.dispose();
+    // Clean up existing meshes
+    state.scene.boardMeshes.forEach(mesh => {
+      scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
     });
-    pieceMeshes = {};
-    clearHighlights();
-    createBoard();
-    setupPieces();
-
-    isMultiplayer = false;
-    currentPlayer = 'r';
-});
-
-// --- WebRTC ---
-function connectWebSocket() {
-    ws = new WebSocket('wss://rtcheckers.graphichealer.com');
-
-    ws.addEventListener('open', () => {
-        console.log('Connected to WS');
-    });
-
-    ws.addEventListener('message', async msg => {
-        const data = JSON.parse(msg.data);
-
-        if (data.type === 'waiting') {
-            waitingScreen.style.display = 'flex';
-            webrtcMenu.style.display = 'none';
-        }
-
-        else if (data.type === 'start') {
-            waitingScreen.style.display = 'none';
-            webrtcMenu.style.display = 'none';
-            roomId = data.roomId;
-            isCaller = data.isCaller;
-            myColor = isCaller ? 'r' : 'b';
-            playerColorDisplay.textContent = myColor === 'r' ? 'Red' : 'Black';
-            undoBtn.style.display = 'none';
-            console.log(`[START] Room ID: ${roomId} | You are ${isCaller ? 'Caller (Master)' : 'Receiver (Guest)'} | Color: ${myColor==='r'?'Red':'Black'}`);
-            setupPeerConnection();
-        }
-
-        else if (data.type === 'offer') {
-            console.log('[SIGNAL] Received offer');
-            if (!pc) setupPeerConnection();
-            try {
-                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-                await flushPendingCandidates();
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                ws.send(JSON.stringify({ type: 'answer', answer, roomId }));
-                console.log('[SIGNAL] Sent answer');
-            } catch (err) {
-                console.error('Error handling offer:', err);
-            }
-        }
-
-        else if (data.type === 'answer') {
-            console.log('[SIGNAL] Received answer');
-            try {
-                if (pc && (!pc.remoteDescription || !pc.remoteDescription.type))
-                    await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                else if (pc && pc.remoteDescription && !pc.remoteDescription.type) // fallback
-                    await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                // In many browsers remoteDescription will be available; flush pending ICE either way
-                await flushPendingCandidates();
-            } catch (err) {
-                // try to set anyway and queue if not ready
-                console.error('Error setting remote description (answer):', err);
-            }
-        }
-
-        else if (data.type === 'ice') {
-            // safely handle ICE candidates (may arrive before remoteDescription)
-            await handleIceCandidate(data.candidate);
-        }
-        
-        else if (data.type === "opponentRequestedNewGame") {
-            console.log("Received opponentRequestedNewGame", data);
-            // If this request came from a reqId we ourselves sent very recently, ignore it
-            if (data.reqId && data.reqId === lastSentNewGameReqId) {
-                console.log("Ignoring opponentRequestedNewGame because it matches our own lastSentNewGameReqId");
-                return;
-            }
-            showNewGamePrompt();
-        }
-
-        else if (data.type === "startNewGame") {
-          console.log("♻️ Both players ready — starting new game", data);
-
-          // Prevent auto-click loops
-          isAutoResetting = true;
-
-          // Reset button state
-          newGameBtn.disabled = false;
-          newGameBtn.style.backgroundColor = "";
-          newGameBtn.textContent = "New Game";
-
-          // Clear request ID
-          lastSentNewGameReqId = null;
-
-          // Start the local reset
-          startLocalNewGame();
+    state.scene.boardMeshes = [];
+    
+    for (let l = 0; l < CONFIG.BOARD.LAYERS; l++) {
+      const layer = [];
+      for (let r = 0; r < CONFIG.BOARD.SIZE; r++) {
+        const row = [];
+        for (let c = 0; c < CONFIG.BOARD.SIZE; c++) {
+          const isDark = (r + c + l) % 2 === 0;
+          const material = new THREE.MeshPhongMaterial({
+            color: isDark ? CONFIG.COLORS.DARK_TILE : CONFIG.COLORS.LIGHT_TILE,
+            transparent: true,
+            opacity: 0.7
+          });
           
-          resetNewGameButtons();
-
-          // Allow new clicks again after short delay
-          setTimeout(() => { isAutoResetting = false; }, 5000);
+          const tile = new THREE.Mesh(geometries.tile, material);
+          tile.position.set(c, l * CONFIG.BOARD.GAP, r);
+          tile.userData = { boardCoord: { l, r, c } };
+          scene.add(tile);
+          state.scene.boardMeshes.push(tile);
+          
+          row.push(null);
         }
-
-        else if (data.type === 'opponentDisconnected') {
-            disconnectedScreen.style.display = 'flex';
-            setTimeout(() => {
-                disconnectedScreen.style.display = 'none';
-                startupMenu.style.display = 'flex';
-                undoBtn.style.display = 'block';
-                isMultiplayer = false;
-                currentPlayer = 'r';
-                Object.values(pieceMeshes).forEach(mesh => {
-                    removeKingBand(mesh);
-                    scene.remove(mesh);
-                    mesh.geometry.dispose();
-                    mesh.material.dispose();
-                });
-                pieceMeshes = {};
-                clearHighlights();
-                createBoard();
-                setupPieces();
-            }, 5000);
-        }
-    });
-}
-
-function setupPeerConnection() {
-    if (pc) return; // prevent duplicate connections
-
-    pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    });
-
-    pc.onicecandidate = e => {
-        if (e.candidate)
-            ws.send(JSON.stringify({ type: 'ice', candidate: e.candidate, roomId }));
-    };
-
-    pc.onconnectionstatechange = () => {
-        console.log('PeerConnection state:', pc.connectionState);
-    };
-
-    pc.ondatachannel = event => {
-        dataChannel = event.channel;
-        setupDataChannel();
-    };
-
-    pc.oniceconnectionstatechange = () => {
-        console.log('ICE connection state:', pc.iceConnectionState);
-    };
-
-    // Caller creates offer
-    if (isCaller) {
-        dataChannel = pc.createDataChannel('game');
-        setupDataChannel();
-        pc.createOffer()
-            .then(offer => pc.setLocalDescription(offer))
-            .then(() => {
-                ws.send(JSON.stringify({ type: 'offer', offer: pc.localDescription, roomId }));
-                console.log('[SIGNAL] Sent offer');
-            })
-            .catch(err => console.error('Offer error:', err));
+        layer.push(row);
+      }
+      state.game.board.push(layer);
     }
-}
+  }
+};
 
-// --- Safe ICE handling (queue until remoteDescription is set) ---
-async function handleIceCandidate(candidate) {
+// ==================== PIECE MANAGEMENT ====================
+const pieces = {
+  setup() {
+    this.clearAll();
+    
+    // Red pieces (bottom layer)
+    for (let r = 5; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        if ((r + c + 2) % 2 === 0) {
+          this.create('r', CONFIG.BOARD.LAYERS - 1, r, c);
+        }
+      }
+    }
+    
+    // Black pieces (top layer)
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 8; c++) {
+        if ((r + c + 2) % 2 === 0) {
+          this.create('b', 0, r, c);
+        }
+      }
+    }
+    
+    ui.updateSidebar();
+  },
+  
+  create(color, l, r, c) {
+    const material = color === 'r' ? materials.red : materials.black;
+    const mesh = new THREE.Mesh(geometries.piece, material);
+    mesh.position.set(c, l * CONFIG.BOARD.GAP + 0.15, r);
+    mesh.userData.boardCoord = { l, r, c };
+    scene.add(mesh);
+    
+    state.game.board[l][r][c] = { c: color, king: false };
+    state.scene.pieceMeshes[utils.getPieceMeshKey(l, r, c)] = mesh;
+  },
+  
+  clearAll() {
+    Object.values(state.scene.pieceMeshes).forEach(mesh => {
+      this.removeKingBand(mesh);
+      scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    });
+    state.scene.pieceMeshes = {};
+  },
+  
+  addKingBand(mesh) {
+    if (mesh.userData.kingBand) return;
+    const band = new THREE.Mesh(geometries.kingBand, materials.gold);
+    band.rotation.x = Math.PI / 2;
+    band.position.y = 0.1;
+    mesh.add(band);
+    mesh.userData.kingBand = band;
+  },
+  
+  removeKingBand(mesh) {
+    if (!mesh.userData.kingBand) return;
+    mesh.remove(mesh.userData.kingBand);
+    mesh.userData.kingBand.geometry.dispose();
+    mesh.userData.kingBand.material.dispose();
+    mesh.userData.kingBand = null;
+  },
+  
+  getMesh(l, r, c) {
+    return state.scene.pieceMeshes[utils.getPieceMeshKey(l, r, c)];
+  }
+};
+
+// ==================== MOVE LOGIC ====================
+const moves = {
+  getValidMoves(l, r, c, onlyJumps = false) {
+    const piece = state.game.board[l][r][c];
+    if (!piece || piece.c !== state.game.currentPlayer) return [];
+    
+    const validMoves = [];
+    const layerOffsets = [-1, 0, 1];
+    const rowOffsets = piece.king ? [-1, 0, 1] : [piece.c === 'r' ? -1 : 1, 0];
+    const colOffsets = [-1, 0, 1];
+    
+    for (let dl of layerOffsets) {
+      for (let dr of rowOffsets) {
+        for (let dc of colOffsets) {
+          if (dl === 0 && dr === 0 && dc === 0) continue;
+          
+          const nl = l + dl, nr = r + dr, nc = c + dc;
+          if (!utils.inBounds(nl, nr, nc) || !utils.isValidTile(nl, nr, nc)) continue;
+          
+          const target = state.game.board[nl][nr][nc];
+          
+          // Simple move
+          if (!target && !onlyJumps) {
+            validMoves.push({ 
+              from: { l, r, c }, 
+              to: { l: nl, r: nr, c: nc }, 
+              captures: [] 
+            });
+          }
+          // Jump move
+          else if (target && target.c !== piece.c) {
+            const jl = nl + dl, jr = nr + dr, jc = nc + dc;
+            if (utils.inBounds(jl, jr, jc) && !state.game.board[jl][jr][jc]) {
+              validMoves.push({ 
+                from: { l, r, c }, 
+                to: { l: jl, r: jr, c: jc }, 
+                captures: [{ l: nl, r: nr, c: nc }] 
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    const jumpMoves = validMoves.filter(m => m.captures.length > 0);
+    return jumpMoves.length > 0 ? jumpMoves : (onlyJumps ? [] : validMoves);
+  },
+  
+  execute(move, sendToRemote = true, isRemote = false) {
+    // Only restrict moves in multiplayer mode
+    if (state.game.isMultiplayer && !isRemote && 
+        state.game.currentPlayer !== state.game.myColor) return;
+    
+    const { from, to } = move;
+    const piece = state.game.board[from.l][from.r][from.c];
+    if (!piece) return;
+    
+    // Save for undo
+    const undoEntry = {
+      from: { ...from },
+      to: { ...to },
+      piece: { ...piece },
+      captured: move.captures.map(cap => {
+        const cp = state.game.board[cap.l][cap.r][cap.c];
+        return cp ? { ...cp, l: cap.l, r: cap.r, c: cap.c } : null;
+      }).filter(Boolean)
+    };
+    state.game.moveHistory.push(undoEntry);
+    
+    // Check for king promotion
+    if (piece.c === 'r' && to.l === 0 && to.r === 0) piece.king = true;
+    if (piece.c === 'b' && to.l === CONFIG.BOARD.LAYERS - 1 && to.r === 7) piece.king = true;
+    
+    const mesh = pieces.getMesh(from.l, from.r, from.c);
+    if (piece.king && mesh && !mesh.userData.kingBand) {
+      pieces.addKingBand(mesh);
+    }
+    
+    // Move piece
+    state.game.board[to.l][to.r][to.c] = piece;
+    state.game.board[from.l][from.r][from.c] = null;
+    
+    // Remove captured pieces
+    move.captures.forEach(cap => {
+      const capMesh = pieces.getMesh(cap.l, cap.r, cap.c);
+      if (capMesh) {
+        pieces.removeKingBand(capMesh);
+        scene.remove(capMesh);
+        capMesh.geometry.dispose();
+        capMesh.material.dispose();
+        delete state.scene.pieceMeshes[utils.getPieceMeshKey(cap.l, cap.r, cap.c)];
+        state.game.board[cap.l][cap.r][cap.c] = null;
+      }
+    });
+    
+    // Update mesh position
+    if (mesh) {
+      mesh.position.set(to.c, to.l * CONFIG.BOARD.GAP + 0.15, to.r);
+      mesh.userData.boardCoord = { ...to };
+      delete state.scene.pieceMeshes[utils.getPieceMeshKey(from.l, from.r, from.c)];
+      state.scene.pieceMeshes[utils.getPieceMeshKey(to.l, to.r, to.c)] = mesh;
+    }
+    
+    visual.clearHighlights();
+    
+    // Check for continued jumps
+    const furtherJumps = this.getValidMoves(to.l, to.r, to.c, true);
+    if (furtherJumps.length > 0 && move.captures.length > 0) {
+      state.game.mustContinueJump = true;
+      state.game.selectedPiece = { ...to };
+      visual.highlightPiece(to.l, to.r, to.c);
+    } else {
+      state.game.mustContinueJump = false;
+      state.game.selectedPiece = null;
+      
+      if (game.checkWin(isRemote)) return;
+      
+      state.game.currentPlayer = state.game.currentPlayer === 'r' ? 'b' : 'r';
+    }
+    
+    ui.updateSidebar();
+    
+    // Send to opponent
+    if (state.game.isMultiplayer && sendToRemote && !isRemote) {
+      network.sendMove(move, state.game.currentPlayer);
+    }
+  },
+  
+  undo() {
+    if (state.game.moveHistory.length === 0) return;
+    
+    const last = state.game.moveHistory.pop();
+    const mesh = pieces.getMesh(last.to.l, last.to.r, last.to.c);
+    
+    if (mesh) {
+      state.game.board[last.from.l][last.from.r][last.from.c] = last.piece;
+      state.game.board[last.to.l][last.to.r][last.to.c] = null;
+      mesh.position.set(last.from.c, last.from.l * CONFIG.BOARD.GAP + 0.15, last.from.r);
+      mesh.userData.boardCoord = { ...last.from };
+      delete state.scene.pieceMeshes[utils.getPieceMeshKey(last.to.l, last.to.r, last.to.c)];
+      state.scene.pieceMeshes[utils.getPieceMeshKey(last.from.l, last.from.r, last.from.c)] = mesh;
+      
+      if (last.piece.king) pieces.addKingBand(mesh);
+      else pieces.removeKingBand(mesh);
+    }
+    
+    // Restore captured pieces
+    last.captured.forEach(cap => {
+      const material = cap.c === 'r' ? materials.red : materials.black;
+      const capMesh = new THREE.Mesh(geometries.piece, material);
+      capMesh.position.set(cap.c, cap.l * CONFIG.BOARD.GAP + 0.15, cap.r);
+      capMesh.userData.boardCoord = { l: cap.l, r: cap.r, c: cap.c };
+      scene.add(capMesh);
+      state.game.board[cap.l][cap.r][cap.c] = { c: cap.c, king: cap.king };
+      if (cap.king) pieces.addKingBand(capMesh);
+      state.scene.pieceMeshes[utils.getPieceMeshKey(cap.l, cap.r, cap.c)] = capMesh;
+    });
+    
+    visual.clearHighlights();
+    state.game.mustContinueJump = false;
+    state.game.selectedPiece = null;
+    state.game.currentPlayer = state.game.currentPlayer === 'r' ? 'b' : 'r';
+    ui.updateSidebar();
+  }
+};
+
+// ==================== VISUAL EFFECTS ====================
+const visual = {
+  clearHighlights() {
+    if (state.scene.outlineMesh) {
+      scene.remove(state.scene.outlineMesh);
+      state.scene.outlineMesh.geometry.dispose();
+      state.scene.outlineMesh.material.dispose();
+      state.scene.outlineMesh = null;
+    }
+    
+    state.scene.virtualMoves.forEach(vm => {
+      scene.remove(vm);
+      vm.geometry.dispose();
+      vm.material.dispose();
+    });
+    state.scene.virtualMoves = [];
+  },
+  
+  highlightPiece(l, r, c) {
+    this.clearHighlights();
+    
+    const mesh = pieces.getMesh(l, r, c);
+    if (!mesh) return;
+    
+    const edges = new THREE.EdgesGeometry(mesh.geometry);
+    state.scene.outlineMesh = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({ color: CONFIG.COLORS.HIGHLIGHT, linewidth: 2 })
+    );
+    state.scene.outlineMesh.position.copy(mesh.position);
+    state.scene.outlineMesh.rotation.copy(mesh.rotation);
+    scene.add(state.scene.outlineMesh);
+    
+    const validMoves = moves.getValidMoves(l, r, c, state.game.mustContinueJump);
+    validMoves.forEach(move => {
+      const vm = new THREE.Mesh(geometries.validMove, materials.validMove);
+      vm.position.set(move.to.c, move.to.l * CONFIG.BOARD.GAP + 0.15, move.to.r);
+      vm.userData.move = move;
+      scene.add(vm);
+      state.scene.virtualMoves.push(vm);
+    });
+  }
+};
+
+// ==================== GAME LOGIC ====================
+const game = {
+  reset() {
+    state.game.currentPlayer = 'r';
+    state.game.mustContinueJump = false;
+    state.game.selectedPiece = null;
+    state.game.moveHistory = [];
+    pieces.clearAll();
+    visual.clearHighlights();
+    board.create();
+    pieces.setup();
+  },
+  
+  checkWin(isRemote = false) {
+    let redCount = 0, blackCount = 0;
+    
+    for (let l = 0; l < CONFIG.BOARD.LAYERS; l++) {
+      for (let r = 0; r < CONFIG.BOARD.SIZE; r++) {
+        for (let c = 0; c < CONFIG.BOARD.SIZE; c++) {
+          const p = state.game.board[l][r][c];
+          if (p) {
+            if (p.c === 'r') redCount++;
+            else blackCount++;
+          }
+        }
+      }
+    }
+    
+    ui.updateSidebar();
+    
+    if (redCount === 0) {
+      this.showWinScreen('b', isRemote);
+      if (state.game.isMultiplayer && !isRemote) network.sendWin('b');
+      return true;
+    }
+    
+    if (blackCount === 0) {
+      this.showWinScreen('r', isRemote);
+      if (state.game.isMultiplayer && !isRemote) network.sendWin('r');
+      return true;
+    }
+    
+    return false;
+  },
+  
+  showWinScreen(winner, isRemote = false) {
+    let text;
+    if (state.game.isMultiplayer) {
+      text = winner === state.game.myColor ? "You Won! 🎉" : `${state.player.opponentName} Wins! 🏆`;
+    } else {
+      text = winner === 'r' ? "Red Wins!" : "Black Wins!";
+    }
+    
+    dom.winText.textContent = text;
+    utils.showModal('win');
+    dom.undoBtn.style.display = 'none';
+  }
+};
+
+// ==================== UI ====================
+const ui = {
+  updateNames() {
+    dom.localName.textContent = `You: ${state.player.displayName}`;
+    dom.remoteName.textContent = state.player.opponentName 
+      ? `Opponent: ${state.player.opponentName}`
+      : "Waiting for Opponent...";
+  },
+
+  updateSidebar() {
+    dom.turnDisplay.textContent = `Turn: ${state.game.currentPlayer === 'r' ? 'Red' : 'Black'}`;
+    
+    let redCount = 0, blackCount = 0;
+    for (let l = 0; l < CONFIG.BOARD.LAYERS; l++) {
+      for (let r = 0; r < CONFIG.BOARD.SIZE; r++) {
+        for (let c = 0; c < CONFIG.BOARD.SIZE; c++) {
+          const p = state.game.board[l][r][c];
+          if (p) {
+            if (p.c === 'r') redCount++;
+            else blackCount++;
+          }
+        }
+      }
+    }
+    
+    dom.redCount.textContent = `Red: ${redCount}`;
+    dom.blackCount.textContent = `Black: ${blackCount}`;
+    
+    ui.updateNames();
+  },
+  
+  resetNewGameButtons() {
+    [dom.newGameBtn, dom.buttons.winNewGame].forEach(btn => {
+      btn.disabled = false;
+      btn.style.backgroundColor = '';
+      btn.textContent = 'New Game';
+    });
+  },
+  
+  showNewGamePrompt() {
+    dom.newGameBtn.style.backgroundColor = '#d9534f';
+    dom.newGameBtn.textContent = 'Opponent wants new game - Click to confirm';
+    dom.newGameBtn.disabled = false;
+    state.network.isRespondingToNewGame = true;
+    
+    setTimeout(() => {
+      if (state.network.isRespondingToNewGame) {
+        state.network.isRespondingToNewGame = false;
+        dom.newGameBtn.textContent = 'New Game';
+        dom.newGameBtn.style.backgroundColor = '';
+        dom.newGameBtn.disabled = false;
+      }
+    }, 15000);
+  }
+};
+
+// ==================== NETWORK ====================
+const network = {
+  connectWebSocket() {
+    state.network.ws = new WebSocket(CONFIG.WS_URL);
+    
+    state.network.ws.addEventListener('open', () => {
+      console.log('WebSocket connected');
+    });
+    
+    state.network.ws.addEventListener('message', async msg => {
+      const data = JSON.parse(msg.data);
+      await this.handleMessage(data);
+    });
+  },
+  
+  async handleMessage(data) {
+    switch (data.type) {
+      case 'ice':
+        await this.handleIceCandidate(data.candidate);
+        break;
+        
+      case 'opponentRequestedNewGame':
+        if (data.reqId && data.reqId === state.network.lastNewGameReqId) return;
+        ui.showNewGamePrompt();
+        break;
+        
+      case 'startNewGame':
+        state.network.isAutoResetting = true;
+        dom.newGameBtn.disabled = false;
+        dom.newGameBtn.style.backgroundColor = '';
+        dom.newGameBtn.textContent = 'New Game';
+        state.network.lastNewGameReqId = null;
+        game.reset();
+        ui.resetNewGameButtons();
+        setTimeout(() => { state.network.isAutoResetting = false; }, 500);
+        break;
+        
+      case 'opponentDisconnected':
+        utils.showModal('disconnected');
+        setTimeout(() => {
+          utils.showModal('startup');
+          dom.undoBtn.style.display = 'block';
+          state.game.isMultiplayer = false;
+          game.reset();
+        }, 5000);
+        break;
+      case 'roomCreated':
+        // Server sent back the new private room code
+        state.network.roomId = data.roomId;
+        utils.showModal('waiting');
+        dom.waitingCode.textContent = `Join Code: ${data.roomId}`;
+        break;
+
+      case 'waitingForOpponent':
+        // Player is waiting in queue or room
+        utils.showModal('waiting');
+        dom.waitingCode.textContent = '';
+        break;
+      
+      case 'matchFound':
+      case 'startGame':
+        // Match found or opponent joined — start the game
+        utils.hideAllModals();
+        state.game.isMultiplayer = true;
+        state.game.myColor = data.isCaller ? 'r' : 'b';
+        dom.playerColor.textContent = state.game.myColor === 'r' ? 'Red' : 'Black';
+        game.reset();
+        
+        // 🟢 Store names
+        state.player.opponentName = data.opponentName || "Opponent";
+        ui.updateNames();
+        
+        // Begin WebRTC connection setup
+        state.network.isCaller = data.isCaller || false;
+        state.network.roomId = data.roomId;
+        network.setupPeerConnection();
+        break;
+
+      case 'offer':
+        await state.network.pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await state.network.pc.createAnswer();
+        await state.network.pc.setLocalDescription(answer);
+        state.network.ws.send(JSON.stringify({
+          type: 'answer',
+          answer,
+          roomId: state.network.roomId
+        }));
+        break;
+
+      case 'answer':
+        await state.network.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        await network.flushPendingIceCandidates();
+        break;
+    }
+  },
+
+  setupPeerConnection() {
+    if (state.network.pc) return;
+    
+    state.network.pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+    
+    state.network.pc.onicecandidate = e => {
+      if (e.candidate) {
+        state.network.ws.send(JSON.stringify({ 
+          type: 'ice', 
+          candidate: e.candidate, 
+          roomId: state.network.roomId 
+        }));
+      }
+    };
+    
+    state.network.pc.ondatachannel = event => {
+      state.network.dataChannel = event.channel;
+      this.setupDataChannel();
+    };
+    
+    if (state.network.isCaller) {
+      state.network.dataChannel = state.network.pc.createDataChannel('game');
+      this.setupDataChannel();
+      
+      state.network.pc.createOffer()
+        .then(offer => state.network.pc.setLocalDescription(offer))
+        .then(() => {
+          state.network.ws.send(JSON.stringify({ 
+            type: 'offer', 
+            offer: state.network.pc.localDescription, 
+            roomId: state.network.roomId 
+          }));
+        });
+    }
+  },
+  
+  async handleIceCandidate(candidate) {
     if (!candidate) return;
-    // If PC doesn't exist yet, queue
-    if (!pc) {
-        console.log('Queuing ICE candidate because pc not created yet');
-        pendingCandidates.push(candidate);
-        return;
-    }
-    // If remoteDescription not yet set, queue
-    if (!pc.remoteDescription || !pc.remoteDescription.type) {
-        console.log('Queuing ICE candidate until remoteDescription is set');
-        pendingCandidates.push(candidate);
-        return;
+    if (!state.network.pc || !state.network.pc.remoteDescription) {
+      state.network.pendingIceCandidates.push(candidate);
+      return;
     }
     try {
-        await pc.addIceCandidate(candidate);
+      await state.network.pc.addIceCandidate(candidate);
     } catch (err) {
-        console.error('Error adding ICE candidate', err);
+      console.error('Error adding ICE candidate:', err);
     }
-}
-
-async function flushPendingCandidates() {
-    if (!pc) return;
-    if (!pendingCandidates.length) return;
-    console.log(`Flushing ${pendingCandidates.length} pending ICE candidate(s)`);
-    for (const cand of pendingCandidates) {
-        try {
-            await pc.addIceCandidate(cand);
-        } catch (err) {
-            console.error('Error flushing ICE candidate', err);
-        }
+  },
+  
+  async flushPendingIceCandidates() {
+    if (!state.network.pc || !state.network.pendingIceCandidates.length) return;
+    
+    for (const candidate of state.network.pendingIceCandidates) {
+      try {
+        await state.network.pc.addIceCandidate(candidate);
+      } catch (err) {
+        console.error('Error flushing ICE candidate:', err);
+      }
     }
-    pendingCandidates = [];
+    state.network.pendingIceCandidates = [];
+  },
+  
+  setupDataChannel() {
+    state.network.dataChannel.onopen = () => {
+      state.network.dataChannelReady = true;
+      while (state.network.dataChannelQueue.length > 0) {
+        state.network.dataChannel.send(state.network.dataChannelQueue.shift());
+      }
+    };
+    
+    state.network.dataChannel.onmessage = e => {
+      const payload = JSON.parse(e.data);
+      
+      if (payload.type === 'move') {
+        moves.execute(payload.move, false, true);
+        if (!game.checkWin(true)) {
+          state.game.currentPlayer = payload.nextTurn;
+        }
+        ui.updateSidebar();
+      } else if (payload.type === 'win') {
+        game.showWinScreen(payload.winner, true);
+        state.game.currentPlayer = null;
+      }
+    };
+    
+    state.network.dataChannel.onclose = () => {
+      state.network.dataChannelReady = false;
+    };
+  },
+  
+  sendMove(move, nextTurn) {
+    const payload = { type: 'move', move, nextTurn };
+    const msg = JSON.stringify(payload);
+    
+    if (state.network.dataChannel && state.network.dataChannelReady) {
+      state.network.dataChannel.send(msg);
+    } else {
+      state.network.dataChannelQueue.push(msg);
+    }
+  },
+  
+  sendWin(winner) {
+    if (state.network.dataChannel && state.network.dataChannelReady) {
+      state.network.dataChannel.send(JSON.stringify({ type: 'win', winner }));
+    }
+  },
+  
+  requestNewGame(button = dom.newGameBtn) {
+    if (state.network.isAutoResetting) return;
+    
+    if (state.network.isRespondingToNewGame) {
+      if (state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+        state.network.ws.send(JSON.stringify({ 
+          type: 'readyForNewGame', 
+          roomId: state.network.roomId 
+        }));
+      }
+      button.textContent = 'Confirming...';
+      button.disabled = true;
+      button.style.backgroundColor = '#888';
+      state.network.isRespondingToNewGame = false;
+      return;
+    }
+    
+    if (state.game.isMultiplayer && state.network.ws && 
+        state.network.ws.readyState === WebSocket.OPEN) {
+      const reqId = Math.random().toString(36).substring(2, 8);
+      state.network.lastNewGameReqId = reqId;
+      
+      state.network.ws.send(JSON.stringify({ 
+        type: 'readyForNewGame', 
+        roomId: state.network.roomId, 
+        reqId 
+      }));
+      
+      button.style.backgroundColor = '#888';
+      button.textContent = 'Waiting for opponent...';
+      button.disabled = true;
+    } else {
+      game.reset();
+    }
+  }
+};
+
+// ==================== INTERACTION ====================
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function onClick(event) {
+  // Only restrict clicks in multiplayer mode
+  if (state.game.isMultiplayer && state.game.currentPlayer !== state.game.myColor) return;
+  
+  const rect = dom.viewport.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  
+  raycaster.setFromCamera(pointer, camera);
+  const intersects = raycaster.intersectObjects(scene.children, true);
+  
+  if (intersects.length === 0) return;
+  
+  for (const hit of intersects) {
+    const obj = hit.object;
+    
+    // Click on valid move indicator
+    if (obj.userData.move) {
+      moves.execute(obj.userData.move);
+      return;
+    }
+    
+    // Click on piece
+    if (obj.userData.boardCoord) {
+      const { l, r, c } = obj.userData.boardCoord;
+      
+      if (state.game.mustContinueJump && 
+          state.game.selectedPiece && 
+          (state.game.selectedPiece.l !== l || 
+           state.game.selectedPiece.r !== r || 
+           state.game.selectedPiece.c !== c)) {
+        return;
+      }
+      
+      const piece = state.game.board[l][r][c];
+      if (!piece || piece.c !== state.game.currentPlayer) return;
+      
+      if (state.game.selectedPiece && 
+          state.game.selectedPiece.l === l && 
+          state.game.selectedPiece.r === r && 
+          state.game.selectedPiece.c === c) {
+        state.game.selectedPiece = null;
+        visual.clearHighlights();
+      } else {
+        state.game.selectedPiece = { l, r, c };
+        visual.highlightPiece(l, r, c);
+      }
+      return;
+    }
+  }
 }
 
-// --- DataChannel ---
-function setupDataChannel() {
-    dataChannel.onopen = () => {
-        console.log('Data channel open');
-        dataChannelReady = true;
-        while (dataChannelQueue.length > 0) {
-            dataChannel.send(dataChannelQueue.shift());
-        }
-    };
+// ==================== EVENT LISTENERS ====================
+dom.viewport.addEventListener('pointerdown', onClick);
 
-    dataChannel.onmessage = e => {
-        const payload = JSON.parse(e.data);
-        if (payload.type === 'move') {
-            movePiece(payload.move, false, true);
-            if (!checkWin(true)) currentPlayer = payload.nextTurn;
-            updateSidebar();
-        }
-        
-        else if (payload.type === 'win') {
-            const winner = payload.winner;
-            showWinScreen(winner, true); 
-            // Prevent flipping turn after remote win
-            currentPlayer = null;
-        }
-    };
+window.addEventListener('resize', () => {
+  camera.aspect = dom.viewport.clientWidth / dom.viewport.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(dom.viewport.clientWidth, dom.viewport.clientHeight);
+});
 
-    dataChannel.onclose = () => {
-        console.warn('Data channel closed');
-        dataChannelReady = false;
-    };
+// Menu buttons
+dom.buttons.local.addEventListener('click', () => {
+  utils.hideAllModals();
+  dom.undoBtn.style.display = 'block';
+  dom.remoteName.style.display = 'none';
+  dom.localName.style.display = 'none';
+  state.game.isMultiplayer = false;
+  state.game.currentPlayer = 'r';
+});
+
+dom.buttons.webrtc.addEventListener('click', () => {
+  utils.showModal('webrtc');
+  dom.undoBtn.style.display = 'none';
+  state.game.isMultiplayer = true;
+});
+
+dom.buttons.back.addEventListener('click', () => {
+  utils.showModal('startup');
+});
+
+dom.buttons.public.addEventListener('click', () => {
+  const name = dom.buttons.displayName.value.trim();
+  if (!name) return alert('Please enter a Name/Handle');
+  state.player.displayName = name;
+  utils.showModal('waiting');
+  dom.waitingCode.textContent = '';
+  dom.gameIdDisplay.style.display = 'none';
+  network.connectWebSocket();
+  state.network.ws.addEventListener('open', () => {
+    state.network.ws.send(JSON.stringify({ type: 'joinPublic', displayName: name }));
+  });
+});
+
+dom.buttons.createPrivate.addEventListener('click', () => {
+  const name = dom.buttons.displayName.value.trim();
+  if (!name) return alert('Please enter a Name/Handle');
+  state.player.displayName = name;
+  const id = Math.random().toString(36).substring(2, 8);
+  dom.gameIdDisplay.textContent = `Game ID: ${id}`;
+  dom.waitingCode.textContent = `Game ID: ${id}`;
+  utils.showModal('waiting');
+  network.connectWebSocket();
+  state.network.ws.addEventListener('open', () => {
+    state.network.ws.send(JSON.stringify({ type: 'createPrivate', roomId: id, displayName: name }));
+  });
+});
+
+dom.buttons.joinPrivate.addEventListener('click', () => {
+  const name = dom.buttons.displayName.value.trim();
+  if (!name) return alert('Please enter a Name/Handle');
+  state.player.displayName = name;
+  const id = dom.buttons.privateInput.value.trim();
+  if (!id) return alert('Please enter a Game ID');
+  dom.waitingCode.textContent = `Joining Room: ${id}`
+  dom.gameIdDisplay.textContent = `Game ID: ${id}`;
+  utils.showModal('waiting');
+  network.connectWebSocket();
+  state.network.ws.addEventListener('open', () => {
+    state.network.ws.send(JSON.stringify({ type: 'joinPrivate', roomId: id, displayName: name }));
+  });
+});
+
+dom.newGameBtn.addEventListener('click', () => {
+  network.requestNewGame(dom.newGameBtn);
+});
+
+dom.undoBtn.addEventListener('click', () => {
+  moves.undo();
+});
+
+dom.buttons.winNewGame.addEventListener('click', () => {
+  utils.hideAllModals();
+  network.requestNewGame(dom.buttons.winNewGame);
+});
+
+dom.buttons.winMainMenu.addEventListener('click', () => {
+  utils.showModal('startup');
+  dom.undoBtn.style.display = 'block';
+  ui.resetNewGameButtons();
+  state.game.isMultiplayer = false;
+  state.game.currentPlayer = 'r';
+  game.reset();
+});
+
+// ==================== ANIMATION LOOP ====================
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
 }
 
-// --- Public / Private Match ---
-publicBtn.addEventListener('click', () => {
-    connectWebSocket();
-    ws.addEventListener('open', () => ws.send(JSON.stringify({ type: 'joinPublic' })));
-});
-
-createPrivateBtn.addEventListener('click', () => {
-    const id = Math.random().toString(36).substring(2, 8);
-    gameIdDisplay.textContent = "Private Game ID: " + id;
-    connectWebSocket();
-    ws.addEventListener('open', () => ws.send(JSON.stringify({ type: 'createPrivate', roomId: id })));
-});
-
-joinPrivateBtn.addEventListener('click', () => {
-    const id = privateGameIdInput.value;
-    if (!id) return alert('Enter Game ID');
-    connectWebSocket();
-    ws.addEventListener('open', () => ws.send(JSON.stringify({ type: 'joinPrivate', roomId: id })));
-});
-
-// --- Animate ---
-function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
+// ==================== INITIALIZATION ====================
+board.create();
+pieces.setup();
 animate();
-
-// --- Init ---
-createBoard();
-setupPieces();
 </script>
 </body>
 </html>
-
-
-
-
-
