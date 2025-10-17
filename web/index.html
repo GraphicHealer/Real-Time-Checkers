@@ -9,8 +9,16 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
 
-#container { display: flex; height: 100vh; }
-#viewport { flex: 1; position: relative; }
+#container {
+    display: flex;
+    height: 100vh; 
+}
+
+#viewport {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
 #sidebar {
     width: 260px;
     background: #2a2a2a;
@@ -18,6 +26,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; o
     padding: 20px;
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
     gap: 10px;
 }
 #waitingCode {
@@ -32,12 +41,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; o
     border-radius: 4px;
     background: #2a2a2a;
 }
-
-.stat-item { 
-    padding: 8px 12px; 
-    background: rgba(255,255,255,0.05); 
-    border-radius: 4px;
-    font-size: 14px;
+#sidebarButtons {
+  margin-top: auto;   /* push entire button group to the bottom */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#playerList {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 10px;
 }
 
 button {
@@ -53,6 +67,13 @@ button {
 }
 button:hover:not(:disabled) { background: #357abd; }
 button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
+
+.stat-item { 
+    padding: 8px 12px; 
+    background: rgba(255,255,255,0.05); 
+    border-radius: 4px;
+    font-size: 14px;
+}
 
 .modal {
     position: fixed;
@@ -77,6 +98,114 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
     background: #333;
     color: white;
 }
+
+.player-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  transition: all 0.3s ease;
+}
+
+.player-profile.active {
+  background: rgba(255,255,255,0.15);
+  box-shadow: 0 0 10px rgba(255,255,255,0.2);
+}
+
+.checker-piece {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #888;
+}
+
+.checker-piece.red {
+  background: radial-gradient(circle at 30% 30%, #ff4b4b, #aa0000);
+}
+
+.checker-piece.black {
+  background: radial-gradient(circle at 30% 30%, #555, #000);
+}
+
+.player-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* === Mobile-Friendly Sidebar (players stacked over buttons) === */
+@media (max-width: 700px) {
+  /* Sidebar moves below game */
+  #container {
+    flex-direction: column; /* sidebar below viewport */
+  }
+
+  #sidebar {
+    width: 100%;
+    flex-direction: column; /* stack contents vertically */
+    align-items: center;
+    justify-content: center;
+    padding: 10px 15px;
+    border-top: 2px solid #333;
+    gap: 10px;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+  }
+
+  /* Hide the title */
+  #sidebar h2 {
+    display: none;
+  }
+
+  /* Players section */
+  #playerList {
+    flex-direction: row; /* players side-by-side */
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .player-profile {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 8px;
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* Buttons section */
+  #sidebarButtons {
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+  }
+
+  #newGameBtn,
+  #undoBtn {
+    flex: 1;
+    padding: 10px;
+  }
+
+  /* Optional: faint divider line between players and buttons */
+  #sidebarButtons {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 6px;
+  }
+
+  /* Optional: subtle shadow above bottom bar */
+  #sidebar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
+    pointer-events: none;
+  }
+}
 </style>
 </head>
 <body>
@@ -84,15 +213,20 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   <div id="viewport"></div>
   <div id="sidebar">
     <h2>3D Checkers</h2>
-    <div class="stat-item" id="localName"></div>
-    <div class="stat-item" id="remoteName"></div>
-    <div class="stat-item" id="playerColorBox">Color: <strong id="playerColor">-</strong></div>
-    <div class="stat-item" id="gameIdDisplay"></div>
-    <div class="stat-item" id="turnDisplay">Turn: Red</div>
-    <div class="stat-item" id="redCount">Red: 0</div>
-    <div class="stat-item" id="blackCount">Black: 0</div>
-    <button id="newGameBtn">New Game</button>
-    <button id="undoBtn">Undo Move</button>
+    <div id="playerList">
+      <div class="player-profile" id="playerRed">
+        <div class="checker-piece red"></div>
+        <div class="player-name" id="redName">Red Player</div>
+      </div>
+      <div class="player-profile" id="playerBlack">
+        <div class="checker-piece black"></div>
+        <div class="player-name" id="blackName">Black Player</div>
+      </div>
+    </div>
+    <div id="sidebarButtons">
+      <button id="newGameBtn">New Game</button>
+      <button id="undoBtn">Undo Move</button>
+    </div>
   </div>
 </div>
 
@@ -188,14 +322,10 @@ const state = {
 // ==================== DOM REFERENCES ====================
 const dom = {
   viewport: document.getElementById('viewport'),
-  turnDisplay: document.getElementById('turnDisplay'),
-  redCount: document.getElementById('redCount'),
-  blackCount: document.getElementById('blackCount'),
-  playerColor: document.getElementById('playerColor'),
-  playerColorBox: document.getElementById('playerColorBox'),
-  localName: document.getElementById('localName'),
-  remoteName: document.getElementById('remoteName'),
-  gameIdDisplay: document.getElementById('gameIdDisplay'),
+  redName: document.getElementById('redName'),
+  blackName: document.getElementById('blackName'),
+  redProfile: document.getElementById('playerRed'),
+  blackProfile: document.getElementById('playerBlack'),
   newGameBtn: document.getElementById('newGameBtn'),
   undoBtn: document.getElementById('undoBtn'),
   waitingCode: document.getElementById('waitingCode'),
@@ -676,32 +806,28 @@ const game = {
 // ==================== UI ====================
 const ui = {
   updateNames() {
-    dom.localName.textContent = `You: ${state.player.displayName}`;
-    dom.remoteName.textContent = state.player.opponentName 
-      ? `Opponent: ${state.player.opponentName}`
-      : "Waiting for Opponent...";
+    // Set player names
+    const redName = (
+        state.game.myColor === 'r' 
+        ? ( state.player.displayName ? `${state.player.displayName} (You)` : null)
+        : state.player.opponentName
+      ) || "Red";
+    const blackName = (
+        state.game.myColor === 'b'
+        ? ( state.player.displayName ? `${state.player.displayName} (You)` : null)
+        : state.player.opponentName
+      ) || "Black";
+
+    dom.redName.textContent = redName;
+    dom.blackName.textContent = blackName;
   },
 
   updateSidebar() {
-    dom.turnDisplay.textContent = `Turn: ${state.game.currentPlayer === 'r' ? 'Red' : 'Black'}`;
-    
-    let redCount = 0, blackCount = 0;
-    for (let l = 0; l < CONFIG.BOARD.LAYERS; l++) {
-      for (let r = 0; r < CONFIG.BOARD.SIZE; r++) {
-        for (let c = 0; c < CONFIG.BOARD.SIZE; c++) {
-          const p = state.game.board[l][r][c];
-          if (p) {
-            if (p.c === 'r') redCount++;
-            else blackCount++;
-          }
-        }
-      }
-    }
-    
-    dom.redCount.textContent = `Red: ${redCount}`;
-    dom.blackCount.textContent = `Black: ${blackCount}`;
-    
-    ui.updateNames();
+    this.updateNames();
+
+    // Highlight the active player
+    dom.redProfile.classList.toggle('active', state.game.currentPlayer === 'r');
+    dom.blackProfile.classList.toggle('active', state.game.currentPlayer === 'b');
   },
   
   resetNewGameButtons() {
@@ -795,7 +921,7 @@ const network = {
         utils.hideAllModals();
         state.game.isMultiplayer = true;
         state.game.myColor = data.isCaller ? 'r' : 'b';
-        dom.playerColor.textContent = state.game.myColor === 'r' ? 'Red' : 'Black';
+        ui.updateNames()
         game.reset();
         
         // 🟢 Store names
@@ -1041,10 +1167,6 @@ window.addEventListener('resize', () => {
 dom.buttons.local.addEventListener('click', () => {
   utils.hideAllModals();
   dom.undoBtn.style.display = 'block';
-  dom.playerColorBox.style.display = 'none';
-  dom.gameIdDisplay.style.display = 'none';
-  dom.remoteName.style.display = 'none';
-  dom.localName.style.display = 'none';
   state.game.isMultiplayer = false;
   state.game.currentPlayer = 'r';
 });
@@ -1065,7 +1187,6 @@ dom.buttons.public.addEventListener('click', () => {
   state.player.displayName = name;
   utils.showModal('waiting');
   dom.waitingCode.textContent = '';
-  dom.gameIdDisplay.style.display = 'none';
   network.connectWebSocket();
   state.network.ws.addEventListener('open', () => {
     state.network.ws.send(JSON.stringify({ type: 'joinPublic', displayName: name }));
@@ -1077,7 +1198,6 @@ dom.buttons.createPrivate.addEventListener('click', () => {
   if (!name) return alert('Please enter a Name/Handle');
   state.player.displayName = name;
   const id = Math.random().toString(36).substring(2, 8);
-  dom.gameIdDisplay.textContent = `Game ID: ${id}`;
   
   const joinUrl = `${window.location.origin}${window.location.pathname}?room=${id}`;
   
@@ -1132,7 +1252,6 @@ dom.buttons.joinPrivate.addEventListener('click', () => {
   const id = dom.buttons.privateInput.value.trim();
   if (!id) return alert('Please enter a Game ID');
   dom.waitingCode.textContent = `Joining Room: ${id}`
-  dom.gameIdDisplay.textContent = `Game ID: ${id}`;
   utils.showModal('waiting');
   network.connectWebSocket();
   state.network.ws.addEventListener('open', () => {
@@ -1178,7 +1297,6 @@ if (autoRoom) {
 
     state.player.displayName = name;
     dom.waitingCode.textContent = `Joining Room: ${autoRoom}`;
-    dom.gameIdDisplay.textContent = `Game ID: ${autoRoom}`;
     utils.showModal('waiting');
 
     network.connectWebSocket();
@@ -1206,4 +1324,3 @@ animate();
 </script>
 </body>
 </html>
-
