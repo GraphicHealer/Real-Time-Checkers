@@ -1043,6 +1043,16 @@ const network = {
         await state.network.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
         await network.flushPendingIceCandidates();
         break;
+      
+      case 'roomInvalid':
+        alert(`Room "${data.roomId}" does not exist or has been closed.`);
+        utils.showModal('webrtc'); // back to join/create modal
+        break;
+
+      case 'roomFull':
+        alert(`Room "${data.roomId}" is already full.`);
+        utils.showModal('webrtc');
+        break;
     }
   },
 
