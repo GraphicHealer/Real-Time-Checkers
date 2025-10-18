@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Extra-Dimensional Real-Time-Checkers</title>
 <link id="favicon" rel="icon" type="image/png" href="">
+<audio id="moveSfx" src="audio/move.mp3" preload="auto"></audio>
+<audio id="captureSfx" src="audio/capture.mp3" preload="auto"></audio>
+<audio id="kingSfx" src="audio/king.mp3" preload="auto"></audio>
+<audio id="winSfx" src="audio/win.mp3" preload="auto"></audio>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -210,11 +214,105 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
     pointer-events: none;
   }
 }
+
+#helpButton {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #4a90e2;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  z-index: 50;
+  transition: all 0.2s;
+}
+
+#helpButton:hover { background: #357abd; transform: scale(1.1); }
+
+#viewToggle {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #4a90e2;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  z-index: 50;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#viewToggle:hover {
+  background: #357abd;
+  transform: scale(1.1);
+}
+
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 99;
+  padding: 20px;
+}
+
+.help-overlay.active { display: flex; }
+
+.help-content {
+  background: #2a2a2a;
+  color: white;
+  padding: 30px;
+  border-radius: 10px;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.help-content h2 { margin-bottom: 20px; color: #4a90e2; }
+.help-content h3 { margin-top: 20px; margin-bottom: 10px; color: #6ab0ff; }
+.help-content p { margin: 8px 0; line-height: 1.6; }
+.help-content .control-item { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.help-close { margin-top: 20px; width: 100%; padding: 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; }
+
+/* Mobile adjustments */
+@media (max-width: 700px) {
+  #helpButton { bottom: 10px; left: 10px; width: 45px; height: 45px; font-size: 20px; }
+  #viewToggle { bottom: 10px; right: 10px; width: 45px; height: 45px; font-size: 20px; }
+}
 </style>
 </head>
 <body>
 <div id="container">
-  <div id="viewport"></div>
+  <div id="viewport">
+    <button id="helpButton" title="Help">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: -1px 0 0 -1px;">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+    </button>
+    <button id="viewToggle" title="Toggle View">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    </button>
+  </div>
   <div id="sidebar">
     <h2>3D Checkers</h2>
     <div id="playerList">
@@ -234,6 +332,32 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   </div>
 </div>
 
+<!-- Help Overlay -->
+<div id="helpOverlay" class="help-overlay">
+  <div class="help-content">
+    <h2>Game Controls</h2>
+    <div id="desktopControls">
+      <h3>Desktop Controls</h3>
+      <div class="control-item"><strong>Click + Drag:</strong> Rotate camera around board</div>
+      <div class="control-item"><strong>Right Click + Drag:</strong> Pan camera</div>
+      <div class="control-item"><strong>Scroll Wheel:</strong> Zoom in/out</div>
+      <div class="control-item"><strong>Click on Piece:</strong> Select piece and show valid moves</div>
+      <div class="control-item"><strong>Click on Green Indicator:</strong> Move to that position</div>
+    </div>
+    <div id="mobileControls" style="display:none;">
+      <h3>Mobile Controls</h3>
+      <div class="control-item"><strong>One Finger Drag:</strong> Rotate camera around board</div>
+      <div class="control-item"><strong>Two Finger Drag:</strong> Pan camera</div>
+      <div class="control-item"><strong>Pinch:</strong> Zoom in/out</div>
+      <div class="control-item"><strong>Tap on Piece:</strong> Select piece and show valid moves</div>
+      <div class="control-item"><strong>Tap on Green Indicator:</strong> Move to that position</div>
+    </div>
+    <h3>How to Play</h3>
+    <div class="control-item">Move pieces diagonally across all three layers. Jump over opponent pieces to capture them. Reach the opposite corner to become a king and move in any direction!</div>
+    <button class="help-close" id="helpClose">Close</button>
+  </div>
+</div>
+
 <!-- Modals -->
 <div id="startupModal" class="modal active">
   <h1>Extra&#x2011;Dimensional Real&#x2011;Time&#x2011;Checkers</h1>
@@ -245,10 +369,16 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   <h1>Online Mode</h1>
   <input id="displayName" placeholder="Enter a Name/Handle">
   <button id="publicBtn">Find Public Game</button>
+  <button id="privateBtn">Private Game</button>
+  <button id="backBtn">Back</button>
+</div>
+
+<div id="privateModal" class="modal">
+  <h1>Private Game</h1>
   <button id="createPrivateBtn">Create Private Game</button>
   <input id="privateGameId" placeholder="Enter Private Game ID">
   <button id="joinPrivateBtn">Join Private Game</button>
-  <button id="backBtn">Back</button>
+  <button id="backToOnlineBtn">Back</button>
 </div>
 
 <div id="waitingModal" class="modal">
@@ -273,8 +403,10 @@ import { OrbitControls } from './three/OrbitControls.js';
 
 // ==================== CONSTANTS ====================
 const CONFIG = {
+  VIEW_MODE: '3D', // '3D' or '2D'
   BOARD: { LAYERS: 3, SIZE: 8, TILE_SIZE: 1, GAP: 1.5 },
-  COLORS: { 
+  COLORS: {
+    WOOD: 0x8B4513,
     DARK_TILE: 0x225522, 
     LIGHT_TILE: 0x888888,
     RED: 0xaa0000,
@@ -319,7 +451,9 @@ const state = {
     boardMeshes: [],
     pieceMeshes: {},
     outlineMesh: null,
-    virtualMoves: []
+    virtualMoves: [],
+    framePosts: [],  // ADD THIS
+    baseBoard: null
   }
 };
 
@@ -337,6 +471,7 @@ const dom = {
   modals: {
     startup: document.getElementById('startupModal'),
     webrtc: document.getElementById('webrtcModal'),
+    private: document.getElementById('privateModal'),
     waiting: document.getElementById('waitingModal'),
     disconnected: document.getElementById('disconnectedModal'),
     win: document.getElementById('winModal')
@@ -347,6 +482,8 @@ const dom = {
     webrtc: document.getElementById('webrtcBtn'),
     displayName: document.getElementById('displayName'),
     public: document.getElementById('publicBtn'),
+    private: document.getElementById('privateBtn'),
+    backToOnline: document.getElementById('backToOnlineBtn'),
     createPrivate: document.getElementById('createPrivateBtn'),
     joinPrivate: document.getElementById('joinPrivateBtn'),
     privateInput: document.getElementById('privateGameId'),
@@ -355,7 +492,21 @@ const dom = {
     winMainMenu: document.getElementById('winMainMenuBtn')
   },
   
-  winText: document.getElementById('winText')
+  helpButton: document.getElementById('helpButton'),
+  helpOverlay: document.getElementById('helpOverlay'),
+  helpClose: document.getElementById('helpClose'),
+  viewToggle: document.getElementById('viewToggle'),
+  desktopControls: document.getElementById('desktopControls'),
+  mobileControls: document.getElementById('mobileControls'),
+  
+  winText: document.getElementById('winText'),
+  
+  sfx: {
+    move: document.getElementById('moveSfx'),
+    capture: document.getElementById('captureSfx'),
+    king: document.getElementById('kingSfx'),
+    win: document.getElementById('winSfx')
+  }
 };
 
 // ==================== THREE.JS SETUP ====================
@@ -400,6 +551,10 @@ const materials = {
     color: CONFIG.COLORS.VALID_MOVE, 
     transparent: true, 
     opacity: 0.5 
+  }),
+  wood: new THREE.MeshPhongMaterial({  // ADD THIS
+    color: CONFIG.COLORS.WOOD,
+    shininess: 30
   })
 };
 
@@ -520,6 +675,9 @@ const board = {
     });
     state.scene.boardMeshes = [];
     
+    // Remove frame and base
+    this.removeFrame();
+    
     for (let l = 0; l < CONFIG.BOARD.LAYERS; l++) {
       const layer = [];
       for (let r = 0; r < CONFIG.BOARD.SIZE; r++) {
@@ -544,6 +702,122 @@ const board = {
       }
       state.game.board.push(layer);
     }
+    
+    // Add frame and base in 3D mode
+    if (CONFIG.VIEW_MODE === '3D') {
+      this.createFrame();
+    }
+    
+    this.updateBoardLayout();
+  },
+  
+  createFrame() {
+    const size = CONFIG.BOARD.SIZE;
+    const postHeight = (CONFIG.BOARD.LAYERS - 1) * CONFIG.BOARD.GAP + 0.31;
+    const postRadius = 0.15;
+    const baseThickness = 0.3;
+    const baseExtend = 0.5;
+    
+    // Create corner posts
+    const postGeometry = new THREE.CylinderGeometry(postRadius, postRadius, postHeight, 16);
+    const corners = [
+      [-baseExtend, 0, -baseExtend],
+      [size - 1 + baseExtend, 0, -baseExtend],
+      [-baseExtend, 0, size - 1 + baseExtend],
+      [size - 1 + baseExtend, 0, size - 1 + baseExtend]
+    ];
+    
+    corners.forEach(([x, y, z]) => {
+      const post = new THREE.Mesh(postGeometry, materials.wood);
+      post.position.set(x, postHeight / 2 - 0.25, z);
+      scene.add(post);
+      state.scene.framePosts.push(post);
+    });
+    
+    // Create base board
+    const baseGeometry = new THREE.BoxGeometry(
+      size + baseExtend * 2,
+      baseThickness,
+      size + baseExtend * 2
+    );
+    state.scene.baseBoard = new THREE.Mesh(baseGeometry, materials.wood);
+    state.scene.baseBoard.position.set(
+      (size - 1) / 2,
+      -baseThickness / 2 - 0.1,
+      (size - 1) / 2
+    );
+    scene.add(state.scene.baseBoard);
+  },
+  
+  removeFrame() {
+    // Remove posts
+    state.scene.framePosts.forEach(post => {
+      scene.remove(post);
+      post.geometry.dispose();
+      post.material.dispose();
+    });
+    state.scene.framePosts = [];
+    
+    // Remove base
+    if (state.scene.baseBoard) {
+      scene.remove(state.scene.baseBoard);
+      state.scene.baseBoard.geometry.dispose();
+      state.scene.baseBoard.material.dispose();
+      state.scene.baseBoard = null;
+    }
+  },
+  
+  updateBoardLayout() {
+    if (CONFIG.VIEW_MODE === '2D') {
+      // Arrange layers side by side
+      const spacing = CONFIG.BOARD.SIZE + 2;
+      
+      for (let l = 0; l < CONFIG.BOARD.LAYERS; l++) {
+        for (let r = 0; r < CONFIG.BOARD.SIZE; r++) {
+          for (let c = 0; c < CONFIG.BOARD.SIZE; c++) {
+            const mesh = state.scene.boardMeshes[l * CONFIG.BOARD.SIZE * CONFIG.BOARD.SIZE + r * CONFIG.BOARD.SIZE + c];
+            if (mesh) {
+              mesh.position.set(c + l * spacing, 0, r);
+            }
+            
+            // Update piece positions
+            const pieceMesh = pieces.getMesh(l, r, c);
+            if (pieceMesh) {
+              pieceMesh.position.set(c + l * spacing, 0.15, r);
+            }
+          }
+        }
+      }
+      
+      // Update camera and controls
+      const centerX = (CONFIG.BOARD.LAYERS - 1) * spacing / 2 + 3.5;
+      controls.target.set(centerX, 0, 3.5);
+      camera.position.set(centerX, 20, 3.5);
+    } else {
+      // 3D stacked layout
+      for (let l = 0; l < CONFIG.BOARD.LAYERS; l++) {
+        for (let r = 0; r < CONFIG.BOARD.SIZE; r++) {
+          for (let c = 0; c < CONFIG.BOARD.SIZE; c++) {
+            const mesh = state.scene.boardMeshes[l * CONFIG.BOARD.SIZE * CONFIG.BOARD.SIZE + r * CONFIG.BOARD.SIZE + c];
+            if (mesh) {
+              mesh.position.set(c, l * CONFIG.BOARD.GAP, r);
+            }
+            
+            // Update piece positions
+            const pieceMesh = pieces.getMesh(l, r, c);
+            if (pieceMesh) {
+              pieceMesh.position.set(c, l * CONFIG.BOARD.GAP + 0.15, r);
+            }
+          }
+        }
+      }
+      
+      // Reset camera
+      controls.target.set(3.5, 0, 3.5);
+      camera.position.set(8, 12, 16);
+    }
+    
+    controls.update();
   }
 };
 
@@ -576,7 +850,15 @@ const pieces = {
   create(color, l, r, c) {
     const material = color === 'r' ? materials.red : materials.black;
     const mesh = new THREE.Mesh(geometries.piece, material);
-    mesh.position.set(c, l * CONFIG.BOARD.GAP + 0.15, r);
+    
+    // Position based on view mode
+    if (CONFIG.VIEW_MODE === '2D') {
+      const spacing = CONFIG.BOARD.SIZE + 2;
+      mesh.position.set(c + l * spacing, 0.15, r);
+    } else {
+      mesh.position.set(c, l * CONFIG.BOARD.GAP + 0.15, r);
+    }
+    
     mesh.userData.boardCoord = { l, r, c };
     scene.add(mesh);
     
@@ -686,8 +968,16 @@ const moves = {
     state.game.moveHistory.push(undoEntry);
     
     // Check for king promotion
-    if (piece.c === 'r' && to.l === 0 && to.r === 0) piece.king = true;
-    if (piece.c === 'b' && to.l === CONFIG.BOARD.LAYERS - 1 && to.r === 7) piece.king = true;
+    if (piece.c === 'r' && to.l === 0 && to.r === 0 && !piece.king) {
+      piece.king = true;
+      dom.sfx.king.currentTime = 0;
+      dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
+    }
+    if (piece.c === 'b' && to.l === CONFIG.BOARD.LAYERS - 1 && to.r === 7 && !piece.king) {
+      piece.king = true;
+      dom.sfx.king.currentTime = 0;
+      dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
+    }
     
     const mesh = pieces.getMesh(from.l, from.r, from.c);
     if (piece.king && mesh && !mesh.userData.kingBand) {
@@ -711,14 +1001,28 @@ const moves = {
       }
     });
     
+    // Play sound effect
+    if (move.captures.length > 0) {
+      dom.sfx.capture.currentTime = 0;
+      dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
+    } else {
+      dom.sfx.move.currentTime = 0;
+      dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
+    }
+    
     // Update mesh position
     if (mesh) {
-      mesh.position.set(to.c, to.l * CONFIG.BOARD.GAP + 0.15, to.r);
+      if (CONFIG.VIEW_MODE === '2D') {
+        const spacing = CONFIG.BOARD.SIZE + 2;
+        mesh.position.set(to.c + to.l * spacing, 0.15, to.r);
+      } else {
+        mesh.position.set(to.c, to.l * CONFIG.BOARD.GAP + 0.15, to.r);
+      }
       mesh.userData.boardCoord = { ...to };
       delete state.scene.pieceMeshes[utils.getPieceMeshKey(from.l, from.r, from.c)];
       state.scene.pieceMeshes[utils.getPieceMeshKey(to.l, to.r, to.c)] = mesh;
     }
-    
+
     visual.clearHighlights();
     
     // Check for continued jumps
@@ -753,7 +1057,14 @@ const moves = {
     if (mesh) {
       state.game.board[last.from.l][last.from.r][last.from.c] = last.piece;
       state.game.board[last.to.l][last.to.r][last.to.c] = null;
-      mesh.position.set(last.from.c, last.from.l * CONFIG.BOARD.GAP + 0.15, last.from.r);
+      
+      if (CONFIG.VIEW_MODE === '2D') {
+        const spacing = CONFIG.BOARD.SIZE + 2;
+        mesh.position.set(last.from.c + last.from.l * spacing, 0.15, last.from.r);
+      } else {
+        mesh.position.set(last.from.c, last.from.l * CONFIG.BOARD.GAP + 0.15, last.from.r);
+      }
+      
       mesh.userData.boardCoord = { ...last.from };
       delete state.scene.pieceMeshes[utils.getPieceMeshKey(last.to.l, last.to.r, last.to.c)];
       state.scene.pieceMeshes[utils.getPieceMeshKey(last.from.l, last.from.r, last.from.c)] = mesh;
@@ -766,7 +1077,14 @@ const moves = {
     last.captured.forEach(cap => {
       const material = cap.color === 'r' ? materials.red : materials.black;
       const capMesh = new THREE.Mesh(geometries.piece, material);
-      capMesh.position.set(cap.c, cap.l * CONFIG.BOARD.GAP + 0.15, cap.r);
+      
+      if (CONFIG.VIEW_MODE === '2D') {
+        const spacing = CONFIG.BOARD.SIZE + 2;
+        capMesh.position.set(cap.c + cap.l * spacing, 0.15, cap.r);
+      } else {
+        capMesh.position.set(cap.c, cap.l * CONFIG.BOARD.GAP + 0.15, cap.r);
+      }
+      
       capMesh.userData.boardCoord = { l: cap.l, r: cap.r, c: cap.c };
       scene.add(capMesh);
       state.game.board[cap.l][cap.r][cap.c] = { c: cap.color, king: cap.king };
@@ -818,7 +1136,14 @@ const visual = {
     const validMoves = moves.getValidMoves(l, r, c, state.game.mustContinueJump);
     validMoves.forEach(move => {
       const vm = new THREE.Mesh(geometries.validMove, materials.validMove);
-      vm.position.set(move.to.c, move.to.l * CONFIG.BOARD.GAP + 0.15, move.to.r);
+      
+      if (CONFIG.VIEW_MODE === '2D') {
+        const spacing = CONFIG.BOARD.SIZE + 2;
+        vm.position.set(move.to.c + move.to.l * spacing, 0.15, move.to.r);
+      } else {
+        vm.position.set(move.to.c, move.to.l * CONFIG.BOARD.GAP + 0.15, move.to.r);
+      }
+      
       vm.userData.move = move;
       scene.add(vm);
       state.scene.virtualMoves.push(vm);
@@ -884,6 +1209,10 @@ const game = {
     } else {
       utils.setFavicon('black', true);
     }
+    
+    // Play win sound
+    dom.sfx.win.currentTime = 0;
+    dom.sfx.win.play().catch(e => console.log('Audio play failed:', e));
     
     dom.winText.textContent = text;
     utils.showModal('win');
@@ -1387,6 +1716,57 @@ dom.buttons.winMainMenu.addEventListener('click', () => {
   state.game.isMultiplayer = false;
   state.game.currentPlayer = 'r';
   game.reset();
+});
+
+// Private modal navigation
+dom.buttons.private.addEventListener('click', () => {
+  utils.showModal('private');
+});
+
+dom.buttons.backToOnline.addEventListener('click', () => {
+  utils.showModal('webrtc');
+});
+
+// Help overlay
+dom.helpButton.addEventListener('click', () => {
+  dom.helpOverlay.classList.add('active');
+});
+
+dom.helpClose.addEventListener('click', () => {
+  dom.helpOverlay.classList.remove('active');
+});
+
+dom.helpOverlay.addEventListener('click', (e) => {
+  if (e.target === dom.helpOverlay) {
+    dom.helpOverlay.classList.remove('active');
+  }
+});
+
+// Detect mobile for help text
+function updateHelpControls() {
+  const isMobile = window.innerWidth <= 700 || 'ontouchstart' in window;
+  dom.desktopControls.style.display = isMobile ? 'none' : 'block';
+  dom.mobileControls.style.display = isMobile ? 'block' : 'none';
+}
+
+window.addEventListener('resize', updateHelpControls);
+updateHelpControls();
+
+// View toggle
+dom.viewToggle.addEventListener('click', () => {
+  if (CONFIG.VIEW_MODE === '3D') {
+    CONFIG.VIEW_MODE = '2D';
+    board.removeFrame();
+    // Disable rotation in 2D
+    controls.enableRotate = false;
+  } else {
+    CONFIG.VIEW_MODE = '3D';
+    board.createFrame();
+    // Re-enable rotation in 3D
+    controls.enableRotate = true;
+  }
+  board.updateBoardLayout();
+  visual.clearHighlights();
 });
 
 // ==================== AUTO-JOIN IF ?room=XYZ IN URL ====================
