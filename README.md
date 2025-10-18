@@ -1,6 +1,6 @@
 # Real-Time-Checkers (RTC, Get it? :D)
 This is a proof of concept game I made using ChatGPT, Claude, and my own code.
-It is Checkers, but you can move in 3D (Multiple Layers)!
+This is the normal checkers version.
 
 ## Running
 Drop the contents of the `web/` folder into a web server and host them, or use GithubPages.
