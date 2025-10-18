@@ -1,4 +1,4 @@
-# Extra Dimensional Real-Time-Checkers (RTC, Get it? :D)
+# Real-Time-Checkers (RTC, Get it? :D)
 This is a proof of concept game I made using ChatGPT, Claude, and my own code.
 It is Checkers, but you can move in 3D (Multiple Layers)!
 
