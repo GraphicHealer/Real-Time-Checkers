@@ -1119,6 +1119,19 @@ const visual = {
   
   clearHighlights() {
     if (state.scene.outlineMesh) {
+      // Stop the pulsing animation
+      if (state.scene.outlineMesh.userData.tween) {
+        state.scene.outlineMesh.userData.tween.stop();
+        TWEEN.remove(state.scene.outlineMesh.userData.tween);
+      }
+      
+      // Remove arrow
+      if (state.scene.outlineMesh.userData.arrow) {
+        scene.remove(state.scene.outlineMesh.userData.arrow);
+        state.scene.outlineMesh.userData.arrow.geometry.dispose();
+        state.scene.outlineMesh.userData.arrow.material.dispose();
+      }
+      
       scene.remove(state.scene.outlineMesh);
       state.scene.outlineMesh.geometry.dispose();
       state.scene.outlineMesh.material.dispose();
@@ -1139,14 +1152,109 @@ const visual = {
     const mesh = pieces.getMesh(l, r, c);
     if (!mesh) return;
     
-    const edges = new THREE.EdgesGeometry(mesh.geometry);
-    state.scene.outlineMesh = new THREE.LineSegments(
-      edges,
-      new THREE.LineBasicMaterial({ color: CONFIG.COLORS.HIGHLIGHT, linewidth: 2 })
+    // Create a flat circle on the tile (spotlight effect)
+    const spotlightGeometry = new THREE.CircleGeometry(0.41, 32);
+    state.scene.outlineMesh = new THREE.Mesh(
+      spotlightGeometry,
+      new THREE.MeshBasicMaterial({ 
+        color: CONFIG.COLORS.HIGHLIGHT,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+      })
     );
-    state.scene.outlineMesh.position.copy(mesh.position);
-    state.scene.outlineMesh.rotation.copy(mesh.rotation);
+    
+    // Position it flat on the tile, slightly above to avoid z-fighting
+    state.scene.outlineMesh.rotation.x = -Math.PI / 2; // Lay flat
+    state.scene.outlineMesh.position.set(
+      mesh.position.x,
+      mesh.position.y - 0.0999, // At tile level (piece is 0.15 above tile)
+      mesh.position.z
+    );
     scene.add(state.scene.outlineMesh);
+    
+    // Create arrow above the piece
+    const arrowHeight = 0.6;
+    const arrowY = mesh.position.y + arrowHeight;
+    
+    const arrowShape = new THREE.Shape();
+    arrowShape.moveTo(0, 0.2);      // Top point
+    arrowShape.lineTo(-0.15, 0);    // Bottom left
+    arrowShape.lineTo(-0.05, 0);    // Shaft left
+    arrowShape.lineTo(-0.05, -0.3); // Shaft bottom left
+    arrowShape.lineTo(0.05, -0.3);  // Shaft bottom right
+    arrowShape.lineTo(0.05, 0);     // Shaft right
+    arrowShape.lineTo(0.15, 0);     // Bottom right
+    arrowShape.lineTo(0, 0.2);      // Back to top
+    
+    const arrowGeometry = new THREE.ShapeGeometry(arrowShape);
+    const arrowMesh = new THREE.Mesh(
+      arrowGeometry,
+      new THREE.MeshBasicMaterial({ 
+        color: CONFIG.COLORS.HIGHLIGHT,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide
+      })
+    );
+    
+    arrowMesh.position.set(mesh.position.x, arrowY, mesh.position.z);
+    arrowMesh.lookAt(camera.position);
+    arrowMesh.rotation.x = Math.PI; // Face down
+    scene.add(arrowMesh);
+    
+    // Store arrow reference
+    state.scene.outlineMesh.userData.arrow = arrowMesh;
+    
+    // Add pulsing animation with smooth looping
+    const pulseAnimation = { scale: 1.0, opacity: 0.6, arrowY: arrowY };
+    
+    function createPulseTween() {
+      return new TWEEN.Tween(pulseAnimation)
+        .to({ scale: 1.2, opacity: 0.8, arrowY: arrowY + 0.15 }, 600)
+        .easing(TWEEN.Easing.Sinusoidal.InOut)
+        .onUpdate(() => {
+          if (state.scene.outlineMesh && state.scene.outlineMesh.userData.tween) {
+            state.scene.outlineMesh.scale.set(pulseAnimation.scale, pulseAnimation.scale, 1);
+            state.scene.outlineMesh.material.opacity = pulseAnimation.opacity;
+            
+            // Animate arrow bouncing
+            if (state.scene.outlineMesh.userData.arrow) {
+              state.scene.outlineMesh.userData.arrow.position.y = pulseAnimation.arrowY;
+            }
+          }
+        })
+        .onComplete(() => {
+          // Pulse back down
+          new TWEEN.Tween(pulseAnimation)
+            .to({ scale: 1.0, opacity: 0.6, arrowY: arrowY }, 600)
+            .easing(TWEEN.Easing.Sinusoidal.InOut)
+            .onUpdate(() => {
+              if (state.scene.outlineMesh && state.scene.outlineMesh.userData.tween) {
+                state.scene.outlineMesh.scale.set(pulseAnimation.scale, pulseAnimation.scale, 1);
+                state.scene.outlineMesh.material.opacity = pulseAnimation.opacity;
+                
+                // Animate arrow bouncing
+                if (state.scene.outlineMesh.userData.arrow) {
+                  state.scene.outlineMesh.userData.arrow.position.y = pulseAnimation.arrowY;
+                }
+              }
+            })
+            .onComplete(() => {
+              // Loop - create new tween
+              if (state.scene.outlineMesh && state.scene.outlineMesh.userData.tween) {
+                state.scene.outlineMesh.userData.tween = createPulseTween();
+              }
+            })
+            .start();
+        })
+        .start();
+    }
+
+    const tween = createPulseTween();
+
+    // Store the tween so we can stop it later
+    state.scene.outlineMesh.userData.tween = tween;
     
     const validMoves = moves.getValidMoves(l, r, c, state.game.mustContinueJump);
     validMoves.forEach(move => {
@@ -1237,7 +1345,7 @@ const animations = {
     });
   },
   
-  crownKing(mesh, duration = 600) {
+  crownKing(mesh, duration = 300) {
     return new Promise(resolve => {
       // Create the crown band
       const band = new THREE.Mesh(geometries.kingBand, materials.gold);
@@ -2016,6 +2124,11 @@ function animate() {
   requestAnimationFrame(animate);
   TWEEN.update();
   controls.update();
+  if (state.scene.outlineMesh && state.scene.outlineMesh.userData.arrow) {
+    const arrow = state.scene.outlineMesh.userData.arrow
+    arrow.lookAt(camera.position);
+    arrow.rotateX(Math.PI);
+  }
   renderer.render(scene, camera);
 }
 
