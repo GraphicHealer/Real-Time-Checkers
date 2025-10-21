@@ -1024,14 +1024,15 @@ const moves = {
       
       // Animate pieces
       await animations.movePiece(mesh, targetPos);
-      if (piece.king && mesh && !mesh.userData.kingBand) {
-        pieces.addKingBand(mesh);
-      }
       mesh.userData.boardCoord = { ...to };
       delete state.scene.pieceMeshes[utils.getPieceMeshKey(from.l, from.r, from.c)];
       state.scene.pieceMeshes[utils.getPieceMeshKey(to.l, to.r, to.c)] = mesh;
     }
-
+    
+    if (piece.king && mesh && !mesh.userData.kingBand) {
+      pieces.addKingBand(mesh);
+    }
+    
     // Play Move sound effect
     if (move.captures.length <= 0) {
       dom.sfx.move.currentTime = 0;
@@ -1935,4 +1936,5 @@ animate();
 </script>
 </body>
 </html>
+
 
