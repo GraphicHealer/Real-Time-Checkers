@@ -981,9 +981,6 @@ const moves = {
     }
     
     const mesh = pieces.getMesh(from.l, from.r, from.c);
-    if (piece.king && mesh && !mesh.userData.kingBand) {
-      pieces.addKingBand(mesh);
-    }
     
     // Move piece
     state.game.board[to.l][to.r][to.c] = piece;
@@ -1027,6 +1024,9 @@ const moves = {
       
       // Animate pieces
       await animations.movePiece(mesh, targetPos);
+      if (piece.king && mesh && !mesh.userData.kingBand) {
+        pieces.addKingBand(mesh);
+      }
       mesh.userData.boardCoord = { ...to };
       delete state.scene.pieceMeshes[utils.getPieceMeshKey(from.l, from.r, from.c)];
       state.scene.pieceMeshes[utils.getPieceMeshKey(to.l, to.r, to.c)] = mesh;
@@ -1935,3 +1935,4 @@ animate();
 </script>
 </body>
 </html>
+
