@@ -11,6 +11,7 @@
 <audio id="winSfx" src="audio/win.mp3" preload="auto"></audio>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
@@ -26,6 +27,7 @@ body {
   min-width: 0;
   position: relative;
 }
+
 #sidebar {
   width: 260px;
   background: #2a2a2a;
@@ -36,24 +38,28 @@ body {
   flex-shrink: 0;
   gap: 10px;
 }
+
 #waitingCode {
-  color:#ccc;
-  font-size:18px;
-  margin-top:-10px;
+  color: #ccc;
+  font-size: 18px;
+  margin-top: -10px;
   text-align: center;
 }
+
 #joinCode {
   font-size: 30px;
   padding: 8px 12px;
   border-radius: 4px;
   background: #2a2a2a;
 }
+
 #sidebarButtons {
-  margin-top: auto;   /* push entire button group to the bottom */
+  margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+
 #playerList {
   display: flex;
   flex-direction: column;
@@ -72,8 +78,16 @@ button {
   color: white;
   transition: background 0.2s;
 }
-button:hover:not(:disabled) { background: #357abd; }
-button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
+
+button:hover:not(:disabled) { 
+  background: #357abd; 
+}
+
+button:disabled { 
+  background: #666; 
+  cursor: not-allowed; 
+  opacity: 0.6; 
+}
 
 .stat-item { 
   padding: 8px 12px; 
@@ -94,9 +108,21 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   z-index: 100;
   gap: 20px;
 }
-.modal.active { display: flex; }
-.modal h1 { color: white; font-size: 32px; margin-bottom: 10px; }
-.modal button { width: 220px; }
+
+.modal.active { 
+  display: flex; 
+}
+
+.modal h1 { 
+  color: white; 
+  font-size: 32px; 
+  margin-bottom: 10px; 
+}
+
+.modal button { 
+  width: 220px; 
+}
+
 .modal input {
   width: 220px;
   padding: 12px;
@@ -142,103 +168,10 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   font-weight: 600;
 }
 
-/* === Mobile-Friendly Sidebar (players stacked over buttons) === */
-@media (max-width: 700px) {
-  /* Sidebar moves below game */
-  #container {
-    flex-direction: column; /* sidebar below viewport */
-  }
-
-  #sidebar {
-    width: 100%;
-    flex-direction: column; /* stack contents vertically */
-    align-items: center;
-    justify-content: center;
-    padding: 10px 15px;
-    border-top: 2px solid #333;
-    gap: 10px;
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
-  }
-
-  /* Hide the title */
-  #sidebar h2 {
-    display: none;
-  }
-
-  /* Players section */
-  #playerList {
-    flex-direction: row; /* players side-by-side */
-    justify-content: center;
-    gap: 12px;
-    width: 100%;
-  }
-
-  .player-profile {
-    flex: 1;
-    justify-content: center;
-    padding: 6px 8px;
-    background: rgba(255,255,255,0.05);
-  }
-
-  /* Buttons section */
-  #sidebarButtons {
-    flex-direction: row;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-  }
-
-  #newGameBtn,
-  #undoBtn {
-    flex: 1;
-    padding: 10px;
-  }
-
-  /* Optional: faint divider line between players and buttons */
-  #sidebarButtons {
-    border-top: 1px solid rgba(255,255,255,0.1);
-    padding-top: 6px;
-  }
-
-  /* Optional: subtle shadow above bottom bar */
-  #sidebar::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 10px;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
-    pointer-events: none;
-  }
-}
-
-#helpButton {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: #4a90e2;
-  color: white;
-  font-size: 24px;
-  font-weight: bold;
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-  z-index: 50;
-  transition: all 0.2s;
-}
-
-#helpButton:hover { background: #357abd; transform: scale(1.1); }
-
+#helpButton,
 #viewToggle {
   position: absolute;
   bottom: 20px;
-  right: 20px;
   width: 50px;
   height: 50px;
   border-radius: 50%;
@@ -255,6 +188,15 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   justify-content: center;
 }
 
+#helpButton {
+  left: 20px;
+}
+
+#viewToggle {
+  right: 20px;
+}
+
+#helpButton:hover,
 #viewToggle:hover {
   background: #357abd;
   transform: scale(1.1);
@@ -271,7 +213,9 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   padding: 20px;
 }
 
-.help-overlay.active { display: flex; }
+.help-overlay.active { 
+  display: flex; 
+}
 
 .help-content {
   background: #2a2a2a;
@@ -283,16 +227,122 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
   overflow-y: auto;
 }
 
-.help-content h2 { margin-bottom: 20px; color: #4a90e2; }
-.help-content h3 { margin-top: 20px; margin-bottom: 10px; color: #6ab0ff; }
-.help-content p { margin: 8px 0; line-height: 1.6; }
-.help-content .control-item { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
-.help-close { margin-top: 20px; width: 100%; padding: 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; }
+.help-content h2 { 
+  margin-bottom: 20px; 
+  color: #4a90e2; 
+}
 
-/* Mobile adjustments */
+.help-content h3 { 
+  margin-top: 20px; 
+  margin-bottom: 10px; 
+  color: #6ab0ff; 
+}
+
+.help-content p { 
+  margin: 8px 0; 
+  line-height: 1.6; 
+}
+
+.help-content .control-item { 
+  padding: 8px 0; 
+  border-bottom: 1px solid rgba(255,255,255,0.1); 
+}
+
+.help-close { 
+  margin-top: 20px; 
+  width: 100%; 
+  padding: 12px; 
+  background: #4a90e2; 
+  color: white; 
+  border: none; 
+  border-radius: 4px; 
+  font-size: 15px; 
+  cursor: pointer; 
+}
+
+/* ===== MOBILE STYLES ===== */
 @media (max-width: 700px) {
-  #helpButton { bottom: 10px; left: 10px; width: 45px; height: 45px; font-size: 20px; }
-  #viewToggle { bottom: 10px; right: 10px; width: 45px; height: 45px; font-size: 20px; }
+  #container {
+    flex-direction: column;
+  }
+
+  #viewport {
+    height: calc(100vh - 120px);
+  }
+
+  #sidebar {
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 15px;
+    border-top: 2px solid #333;
+    gap: 10px;
+    position: relative;
+    z-index: 10;
+    height: auto;
+  }
+
+  #sidebar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
+    pointer-events: none;
+  }
+
+  #sidebar h2 {
+    display: none;
+  }
+
+  #playerList {
+    flex-direction: row;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .player-profile {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 8px;
+  }
+
+  #sidebarButtons {
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 6px;
+  }
+
+  #newGameBtn,
+  #undoBtn {
+    flex: 1;
+    padding: 10px;
+  }
+
+  #helpButton,
+  #viewToggle {
+    bottom: 10px;
+    width: 45px;
+    height: 45px;
+    font-size: 20px;
+  }
+
+  #helpButton {
+    left: 10px;
+  }
+
+  #viewToggle {
+    right: 10px;
+  }
 }
 </style>
 </head>
@@ -2139,3 +2189,4 @@ animate();
 </script>
 </body>
 </html>
+
