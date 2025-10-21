@@ -399,7 +399,6 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
 
 <script type="module">
 import * as THREE from './three/three.module.js';
-import TWEEN from './three/tween.esm.js';
 import { OrbitControls } from './three/OrbitControls.js';
 
 // ==================== CONSTANTS ====================
@@ -989,53 +988,40 @@ const moves = {
     // Move piece
     state.game.board[to.l][to.r][to.c] = piece;
     state.game.board[from.l][from.r][from.c] = null;
-
-    // Play Capture sound effect
-    if (move.captures.length > 0) {
-      dom.sfx.capture.currentTime = 0;
-      dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
-    }
     
     // Remove captured pieces
     move.captures.forEach(cap => {
       const capMesh = pieces.getMesh(cap.l, cap.r, cap.c);
       if (capMesh) {
-        return animations.capturePiece(capMesh).then(() => {
-          pieces.removeKingBand(capMesh);
-          scene.remove(capMesh);
-          capMesh.geometry.dispose();
-          capMesh.material.dispose();
-          delete state.scene.pieceMeshes[utils.getPieceMeshKey(cap.l, cap.r, cap.c)];
-          state.game.board[cap.l][cap.r][cap.c] = null;
-        });
+        pieces.removeKingBand(capMesh);
+        scene.remove(capMesh);
+        capMesh.geometry.dispose();
+        capMesh.material.dispose();
+        delete state.scene.pieceMeshes[utils.getPieceMeshKey(cap.l, cap.r, cap.c)];
+        state.game.board[cap.l][cap.r][cap.c] = null;
       }
     });
-
+    
+    // Play sound effect
+    if (move.captures.length > 0) {
+      dom.sfx.capture.currentTime = 0;
+      dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
+    } else {
+      dom.sfx.move.currentTime = 0;
+      dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
+    }
+    
     // Update mesh position
     if (mesh) {
-      const targetPos = CONFIG.VIEW_MODE === '2D' 
-        ? { 
-            x: to.c + to.l * (CONFIG.BOARD.SIZE + 2), 
-            y: 0.15, 
-            z: to.r 
-          }
-        : { 
-            x: to.c, 
-            y: to.l * CONFIG.BOARD.GAP + 0.15, 
-            z: to.r 
-          };
-      
-      // Animate pieces
-      animations.movePiece(mesh, targetPos);
+      if (CONFIG.VIEW_MODE === '2D') {
+        const spacing = CONFIG.BOARD.SIZE + 2;
+        mesh.position.set(to.c + to.l * spacing, 0.15, to.r);
+      } else {
+        mesh.position.set(to.c, to.l * CONFIG.BOARD.GAP + 0.15, to.r);
+      }
       mesh.userData.boardCoord = { ...to };
       delete state.scene.pieceMeshes[utils.getPieceMeshKey(from.l, from.r, from.c)];
       state.scene.pieceMeshes[utils.getPieceMeshKey(to.l, to.r, to.c)] = mesh;
-    }
-
-    // Play Move sound effect
-    if (move.captures.length <= 0) {
-      dom.sfx.move.currentTime = 0;
-      dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
     }
 
     visual.clearHighlights();
@@ -1162,46 +1148,6 @@ const visual = {
       vm.userData.move = move;
       scene.add(vm);
       state.scene.virtualMoves.push(vm);
-    });
-  }
-};
-
-const animations = {
-  movePiece(mesh, targetPos, duration = 500) {
-    return new Promise(resolve => {
-      const start = { 
-        x: mesh.position.x, 
-        y: mesh.position.y, 
-        z: mesh.position.z 
-      };
-      
-      new TWEEN.Tween(start)
-        .to(targetPos, duration)
-        .easing(TWEEN.Easing.Quadratic.InOut)
-        .onUpdate(() => {
-          mesh.position.set(start.x, start.y, start.z);
-        })
-        .onComplete(() => resolve())
-        .start();
-    });
-  },
-  
-  capturePiece(mesh, duration = 100) {
-    return new Promise(resolve => {
-      const start = { 
-        scale: 1, 
-        y: mesh.position.y 
-      };
-      
-      new TWEEN.Tween(start)
-        .to({ scale: 0, y: mesh.position.y}, duration)
-        .easing(TWEEN.Easing.Circular.In)
-        .onUpdate(() => {
-          mesh.scale.set(start.scale, start.scale, start.scale);
-          mesh.position.y = start.y;
-        })
-        .onComplete(() => resolve())
-        .start();
     });
   }
 };
@@ -1923,7 +1869,6 @@ if (autoRoom) {
 // ==================== ANIMATION LOOP ====================
 function animate() {
   requestAnimationFrame(animate);
-  TWEEN.update();
   controls.update();
   renderer.render(scene, camera);
 }
@@ -1935,4 +1880,3 @@ animate();
 </script>
 </body>
 </html>
-
