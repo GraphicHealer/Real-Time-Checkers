@@ -398,8 +398,9 @@ button:disabled { background: #666; cursor: not-allowed; opacity: 0.6; }
 </div>
 
 <script type="module">
-import * as THREE from './three/three.module.js';
-import { OrbitControls } from './three/OrbitControls.js';
+import * as THREE from './scripts/three.module.js';
+import TWEEN from './scripts/tween.esm.js';
+import { OrbitControls } from './scripts/OrbitControls.js';
 
 // ==================== CONSTANTS ====================
 const CONFIG = {
@@ -985,7 +986,7 @@ const moves = {
     // Play Capture sound effect
     if (move.captures.length > 0) {
       dom.sfx.capture.currentTime = 0;
-      dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
+      await dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
     }
     
     // Remove captured pieces
@@ -1026,15 +1027,13 @@ const moves = {
     }
     
     // Play Move sound effect
-    if (move.captures.length <= 0) {
-      dom.sfx.move.currentTime = 0;
-      dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
-    }
+    dom.sfx.move.currentTime = 0;
+    await dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
 
     if (piece.king && mesh && !mesh.userData.kingBand) {
       pieces.addKingBand(mesh);
       dom.sfx.king.currentTime = 0;
-      dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
+      await dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
     }
     
     visual.clearHighlights();
@@ -1176,7 +1175,7 @@ const animations = {
       
       new TWEEN.Tween(start)
         .to(targetPos, duration)
-        .easing(TWEEN.Easing.Quadratic.InOut)
+        .easing(TWEEN.Easing.Sinusoidal.In)
         .onUpdate(() => {
           mesh.position.set(start.x, start.y, start.z);
         })
@@ -1934,6 +1933,3 @@ animate();
 </script>
 </body>
 </html>
-
-
-
