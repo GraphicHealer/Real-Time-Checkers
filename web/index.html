@@ -441,7 +441,8 @@ const state = {
     roomId: null,
     lastNewGameReqId: null,
     isRespondingToNewGame: false,
-    isAutoResetting: false
+    isAutoResetting: false,
+    keepAliveInterval: null
   },
   player: {
     displayName: "",
@@ -1402,6 +1403,27 @@ const network = {
       }
     };
     
+    // Monitor connection state
+    state.network.pc.onconnectionstatechange = () => {
+      console.log('Connection state:', state.network.pc.connectionState);
+      
+      if (state.network.pc.connectionState === 'failed' || 
+          state.network.pc.connectionState === 'disconnected') {
+        console.log('Connection lost, attempting recovery...');
+        this.handleConnectionFailure();
+      }
+    };
+
+    // Monitor ICE connection state
+    state.network.pc.oniceconnectionstatechange = () => {
+      console.log('ICE connection state:', state.network.pc.iceConnectionState);
+      
+      if (state.network.pc.iceConnectionState === 'failed') {
+        console.log('ICE connection failed, restarting...');
+        state.network.pc.restartIce();
+      }
+    };
+    
     state.network.pc.ondatachannel = event => {
       state.network.dataChannel = event.channel;
       this.setupDataChannel();
@@ -1449,16 +1471,39 @@ const network = {
     state.network.pendingIceCandidates = [];
   },
   
+  handleConnectionFailure() {
+    if (state.game.isMultiplayer) {
+      utils.showModal('disconnected');
+      setTimeout(() => {
+        utils.showModal('startup');
+        dom.undoBtn.style.display = 'block';
+        state.game.isMultiplayer = false;
+        game.reset();
+      }, 5000);
+    }
+  },
+  
   setupDataChannel() {
     state.network.dataChannel.onopen = () => {
       state.network.dataChannelReady = true;
       while (state.network.dataChannelQueue.length > 0) {
         state.network.dataChannel.send(state.network.dataChannelQueue.shift());
       }
+      // Start keep-alive ping
+      this.startKeepAlive();
     };
     
     state.network.dataChannel.onmessage = e => {
       const payload = JSON.parse(e.data);
+  
+      if (payload.type === 'ping') {
+        this.sendDataChannel({ type: 'pong' });
+        return;
+      }
+      
+      if (payload.type === 'pong') {
+        return;
+      }
       
       if (payload.type === 'move') {
         moves.execute(payload.move, false, true);
@@ -1473,25 +1518,48 @@ const network = {
     };
     
     state.network.dataChannel.onclose = () => {
+      console.log('Data channel closed');
       state.network.dataChannelReady = false;
+      this.stopKeepAlive();
     };
   },
   
-  sendMove(move, nextTurn) {
-    const payload = { type: 'move', move, nextTurn };
+  startKeepAlive() {
+    this.stopKeepAlive();
+    state.network.keepAliveInterval = setInterval(() => {
+      if (state.network.dataChannelReady) {
+        this.sendDataChannel({ type: 'ping' });
+      }
+    }, 15000);
+  },
+
+  stopKeepAlive() {
+    if (state.network.keepAliveInterval) {
+      clearInterval(state.network.keepAliveInterval);
+      state.network.keepAliveInterval = null;
+    }
+  },
+
+  sendDataChannel(payload) {
     const msg = JSON.stringify(payload);
-    
     if (state.network.dataChannel && state.network.dataChannelReady) {
-      state.network.dataChannel.send(msg);
+      try {
+        state.network.dataChannel.send(msg);
+      } catch (err) {
+        console.error('Error sending data:', err);
+        state.network.dataChannelQueue.push(msg);
+      }
     } else {
       state.network.dataChannelQueue.push(msg);
     }
   },
   
+  sendMove(move, nextTurn) {
+    this.sendDataChannel({ type: 'move', move, nextTurn });
+  },
+
   sendWin(winner) {
-    if (state.network.dataChannel && state.network.dataChannelReady) {
-      state.network.dataChannel.send(JSON.stringify({ type: 'win', winner }));
-    }
+    this.sendDataChannel({ type: 'win', winner });
   },
   
   requestNewGame(button = dom.newGameBtn) {
@@ -1812,5 +1880,3 @@ animate();
 </script>
 </body>
 </html>
-
-
