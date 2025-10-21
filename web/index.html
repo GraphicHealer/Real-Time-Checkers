@@ -585,6 +585,10 @@ const utils = {
     Object.values(dom.modals).forEach(m => m.classList.remove('active'));
   },
   
+  isRed(color) {
+    return color === 'r' || color === 'red' || color === '#ff4b4b';
+  },
+  
   setFavicon(color, isWinner = false) {
     const canvas = document.createElement("canvas");
     const size = 64;
@@ -599,9 +603,9 @@ const utils = {
     const radiusY = 10;
 
     // --- Base colors ---
-    const baseColor = color === "red" || color === "#ff4b4b" ? "#c62828" : "#111";
-    const sideColor = color === "red" || color === "#ff4b4b" ? "#8b1a1a" : "#000";
-    const edgeHighlight = color === "red" || color === "#ff4b4b" ? "#ff6b6b" : "#444";
+    const baseColor = utils.isRed(color) ? "#c62828" : "#111";
+    const sideColor = utils.isRed(color) ? "#8b1a1a" : "#000";
+    const edgeHighlight = utils.isRed(color) ? "#ff6b6b" : "#444";
 
     // --- Shadow below the piece ---
     ctx.beginPath();
@@ -785,7 +789,8 @@ const board = {
             // Update piece positions
             const pieceMesh = pieces.getMesh(l, r, c);
             if (pieceMesh) {
-              pieceMesh.position.set(c + l * spacing, 0.15, r);
+              const pos = visual.getPosition(l, r, c);
+              pieceMesh.position.set(pos.x, pos.y, pos.z);
             }
           }
         }
@@ -808,7 +813,8 @@ const board = {
             // Update piece positions
             const pieceMesh = pieces.getMesh(l, r, c);
             if (pieceMesh) {
-              pieceMesh.position.set(c, l * CONFIG.BOARD.GAP + 0.15, r);
+              const pos = visual.getPosition(l, r, c);
+              pieceMesh.position.set(pos.x, pos.y, pos.z);
             }
           }
         }
@@ -853,13 +859,8 @@ const pieces = {
     const material = color === 'r' ? materials.red : materials.black;
     const mesh = new THREE.Mesh(geometries.piece, material);
     
-    // Position based on view mode
-    if (CONFIG.VIEW_MODE === '2D') {
-      const spacing = CONFIG.BOARD.SIZE + 2;
-      mesh.position.set(c + l * spacing, 0.15, r);
-    } else {
-      mesh.position.set(c, l * CONFIG.BOARD.GAP + 0.15, r);
-    }
+    const pos = visual.getPosition(l, r, c);
+    mesh.position.set(pos.x, pos.y, pos.z);
     
     mesh.userData.boardCoord = { l, r, c };
     scene.add(mesh);
@@ -872,8 +873,6 @@ const pieces = {
     Object.values(state.scene.pieceMeshes).forEach(mesh => {
       this.removeKingBand(mesh);
       scene.remove(mesh);
-      mesh.geometry.dispose();
-      mesh.material.dispose();
     });
     state.scene.pieceMeshes = {};
   },
@@ -986,7 +985,7 @@ const moves = {
     // Play Capture sound effect
     if (move.captures.length > 0) {
       dom.sfx.capture.currentTime = 0;
-      await dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
+      dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
     }
     
     // Remove captured pieces
@@ -1005,18 +1004,7 @@ const moves = {
     
     // Update mesh position
     if (mesh) {
-      const targetPos = CONFIG.VIEW_MODE === '2D' 
-        ? { 
-            x: to.c + to.l * (CONFIG.BOARD.SIZE + 2), 
-            y: 0.15, 
-            z: to.r 
-          }
-        : { 
-            x: to.c, 
-            y: to.l * CONFIG.BOARD.GAP + 0.15, 
-            z: to.r 
-          };
-      
+      const targetPos = visual.getPosition(to.l, to.r, to.c);
       visual.clearHighlights();
       
       // Animate pieces
@@ -1028,12 +1016,12 @@ const moves = {
     
     // Play Move sound effect
     dom.sfx.move.currentTime = 0;
-    await dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
+    dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
 
     if (piece.king && mesh && !mesh.userData.kingBand) {
       pieces.addKingBand(mesh);
       dom.sfx.king.currentTime = 0;
-      await dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
+      dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
     }
     
     visual.clearHighlights();
@@ -1044,21 +1032,25 @@ const moves = {
       state.game.mustContinueJump = true;
       state.game.selectedPiece = { ...to };
       visual.highlightPiece(to.l, to.r, to.c);
+      
+      // Send to opponent during multi-jump (don't switch players yet)
+      if (state.game.isMultiplayer && sendToRemote && !isRemote) {
+        network.sendMove(move, state.game.currentPlayer);
+      }
     } else {
       state.game.mustContinueJump = false;
       state.game.selectedPiece = null;
       
       if (game.checkWin(isRemote)) return;
       
+      // Send to opponent
+      if (state.game.isMultiplayer && sendToRemote && !isRemote) {
+        network.sendMove(move, state.game.currentPlayer);
+      }
       state.game.currentPlayer = state.game.currentPlayer === 'r' ? 'b' : 'r';
     }
     
     ui.updateSidebar();
-    
-    // Send to opponent
-    if (state.game.isMultiplayer && sendToRemote && !isRemote) {
-      network.sendMove(move, state.game.currentPlayer);
-    }
   },
   
   undo() {
@@ -1071,12 +1063,8 @@ const moves = {
       state.game.board[last.from.l][last.from.r][last.from.c] = last.piece;
       state.game.board[last.to.l][last.to.r][last.to.c] = null;
       
-      if (CONFIG.VIEW_MODE === '2D') {
-        const spacing = CONFIG.BOARD.SIZE + 2;
-        mesh.position.set(last.from.c + last.from.l * spacing, 0.15, last.from.r);
-      } else {
-        mesh.position.set(last.from.c, last.from.l * CONFIG.BOARD.GAP + 0.15, last.from.r);
-      }
+      const pos = visual.getPosition(last.from.l, last.from.r, last.from.c);
+      mesh.position.set(pos.x, pos.y, pos.z);
       
       mesh.userData.boardCoord = { ...last.from };
       delete state.scene.pieceMeshes[utils.getPieceMeshKey(last.to.l, last.to.r, last.to.c)];
@@ -1091,12 +1079,8 @@ const moves = {
       const material = cap.color === 'r' ? materials.red : materials.black;
       const capMesh = new THREE.Mesh(geometries.piece, material);
       
-      if (CONFIG.VIEW_MODE === '2D') {
-        const spacing = CONFIG.BOARD.SIZE + 2;
-        capMesh.position.set(cap.c + cap.l * spacing, 0.15, cap.r);
-      } else {
-        capMesh.position.set(cap.c, cap.l * CONFIG.BOARD.GAP + 0.15, cap.r);
-      }
+      const pos = visual.getPosition(cap.l, cap.r, cap.c);
+      capMesh.position.set(pos.x, pos.y, pos.z);
       
       capMesh.userData.boardCoord = { l: cap.l, r: cap.r, c: cap.c };
       scene.add(capMesh);
@@ -1108,13 +1092,27 @@ const moves = {
     visual.clearHighlights();
     state.game.mustContinueJump = false;
     state.game.selectedPiece = null;
-    state.game.currentPlayer = state.game.currentPlayer === 'r' ? 'b' : 'r';
+    
+    // Only switch players if the undone move didn't have a multi-jump
+    const hadMoreJumps = moves.getValidMoves(last.from.l, last.from.r, last.from.c, true).length > 0;
+    if (!hadMoreJumps || last.captured.length === 0) {
+      state.game.currentPlayer = state.game.currentPlayer === 'r' ? 'b' : 'r';
+    }
+    
     ui.updateSidebar();
   }
 };
 
 // ==================== VISUAL EFFECTS ====================
 const visual = {
+  getPosition(l, r, c) {
+    if (CONFIG.VIEW_MODE === '2D') {
+      const spacing = CONFIG.BOARD.SIZE + 2;
+      return { x: c + l * spacing, y: 0.15, z: r };
+    }
+    return { x: c, y: l * CONFIG.BOARD.GAP + 0.15, z: r };
+  },
+  
   clearHighlights() {
     if (state.scene.outlineMesh) {
       scene.remove(state.scene.outlineMesh);
@@ -1150,12 +1148,8 @@ const visual = {
     validMoves.forEach(move => {
       const vm = new THREE.Mesh(geometries.validMove, materials.validMove);
       
-      if (CONFIG.VIEW_MODE === '2D') {
-        const spacing = CONFIG.BOARD.SIZE + 2;
-        vm.position.set(move.to.c + move.to.l * spacing, 0.15, move.to.r);
-      } else {
-        vm.position.set(move.to.c, move.to.l * CONFIG.BOARD.GAP + 0.15, move.to.r);
-      }
+      const pos = visual.getPosition(move.to.l, move.to.r, move.to.c);
+      vm.position.set(pos.x, pos.y, pos.z);
       
       vm.userData.move = move;
       scene.add(vm);
@@ -1165,7 +1159,7 @@ const visual = {
 };
 
 const animations = {
-  movePiece(mesh, targetPos, duration = 500) {
+  movePiece(mesh, targetPos, duration = 300) {
     return new Promise(resolve => {
       const start = { 
         x: mesh.position.x, 
@@ -1276,20 +1270,18 @@ const game = {
 // ==================== UI ====================
 const ui = {
   updateNames() {
-    // Set player names
-    const redName = (
-        state.game.myColor === 'r' 
-        ? ( state.player.displayName ? `${state.player.displayName} (You)` : null)
-        : state.player.opponentName
-      ) || "Red";
-    const blackName = (
-        state.game.myColor === 'b'
-        ? ( state.player.displayName ? `${state.player.displayName} (You)` : null)
-        : state.player.opponentName
-      ) || "Black";
+    const getPlayerName = (isMyColor) => {
+      if (!state.game.isMultiplayer) {
+        return isMyColor ? "Red" : "Black";
+      }
+      if (isMyColor && state.player.displayName) {
+        return `${state.player.displayName} (You)`;
+      }
+      return state.player.opponentName || (isMyColor ? "Red" : "Black");
+    };
 
-    dom.redName.textContent = redName;
-    dom.blackName.textContent = blackName;
+    dom.redName.textContent = getPlayerName(state.game.myColor === 'r');
+    dom.blackName.textContent = getPlayerName(state.game.myColor === 'b');
   },
 
   updateSidebar() {
@@ -1591,6 +1583,29 @@ const network = {
       state.network.keepAliveInterval = null;
     }
   },
+  
+  cleanup() {
+    this.stopKeepAlive();
+    
+    if (state.network.dataChannel) {
+      state.network.dataChannel.close();
+      state.network.dataChannel = null;
+    }
+    
+    if (state.network.pc) {
+      state.network.pc.close();
+      state.network.pc = null;
+    }
+    
+    if (state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+      state.network.ws.close();
+      state.network.ws = null;
+    }
+    
+    state.network.dataChannelReady = false;
+    state.network.dataChannelQueue = [];
+    state.network.pendingIceCandidates = [];
+  },
 
   sendDataChannel(payload) {
     const msg = JSON.stringify(payload);
@@ -1830,6 +1845,7 @@ dom.buttons.winNewGame.addEventListener('click', () => {
 });
 
 dom.buttons.winMainMenu.addEventListener('click', () => {
+  network.cleanup();
   utils.showModal('startup');
   dom.undoBtn.style.display = 'block';
   ui.resetNewGameButtons();
