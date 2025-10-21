@@ -971,13 +971,9 @@ const moves = {
     // Check for king promotion
     if (piece.c === 'r' && to.l === 0 && to.r === 0 && !piece.king) {
       piece.king = true;
-      dom.sfx.king.currentTime = 0;
-      dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
     }
     if (piece.c === 'b' && to.l === CONFIG.BOARD.LAYERS - 1 && to.r === 7 && !piece.king) {
       piece.king = true;
-      dom.sfx.king.currentTime = 0;
-      dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
     }
     
     const mesh = pieces.getMesh(from.l, from.r, from.c);
@@ -1029,14 +1025,16 @@ const moves = {
       state.scene.pieceMeshes[utils.getPieceMeshKey(to.l, to.r, to.c)] = mesh;
     }
     
-    if (piece.king && mesh && !mesh.userData.kingBand) {
-      pieces.addKingBand(mesh);
-    }
-    
     // Play Move sound effect
     if (move.captures.length <= 0) {
       dom.sfx.move.currentTime = 0;
       dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
+    }
+
+    if (piece.king && mesh && !mesh.userData.kingBand) {
+      pieces.addKingBand(mesh);
+      dom.sfx.king.currentTime = 0;
+      dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
     }
     
     visual.clearHighlights();
@@ -1936,5 +1934,6 @@ animate();
 </script>
 </body>
 </html>
+
 
 
