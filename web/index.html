@@ -557,6 +557,16 @@ const materials = {
   wood: new THREE.MeshPhongMaterial({  // ADD THIS
     color: CONFIG.COLORS.WOOD,
     shininess: 30
+  }),
+  darkTile: new THREE.MeshPhongMaterial({  // ADD THESE TWO
+    color: CONFIG.COLORS.DARK_TILE,
+    transparent: true,
+    opacity: 0.7
+  }),
+  lightTile: new THREE.MeshPhongMaterial({
+    color: CONFIG.COLORS.LIGHT_TILE,
+    transparent: true,
+    opacity: 0.7
   })
 };
 
@@ -677,7 +687,6 @@ const board = {
     state.scene.boardMeshes.forEach(mesh => {
       scene.remove(mesh);
       mesh.geometry.dispose();
-      mesh.material.dispose();
     });
     state.scene.boardMeshes = [];
     
@@ -690,12 +699,7 @@ const board = {
         const row = [];
         for (let c = 0; c < CONFIG.BOARD.SIZE; c++) {
           const isDark = (r + c + l) % 2 === 0;
-          const material = new THREE.MeshPhongMaterial({
-            color: isDark ? CONFIG.COLORS.DARK_TILE : CONFIG.COLORS.LIGHT_TILE,
-            transparent: true,
-            opacity: 0.7
-          });
-          
+          const material = isDark ? materials.darkTile : materials.lightTile;
           const tile = new THREE.Mesh(geometries.tile, material);
           tile.position.set(c, l * CONFIG.BOARD.GAP, r);
           tile.userData = { boardCoord: { l, r, c } };
@@ -1019,9 +1023,9 @@ const moves = {
     dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
 
     if (piece.king && mesh && !mesh.userData.kingBand) {
-      pieces.addKingBand(mesh);
       dom.sfx.king.currentTime = 0;
       dom.sfx.king.play().catch(e => console.log('Audio play failed:', e));
+      await animations.crownKing(mesh);
     }
     
     visual.clearHighlights();
@@ -1167,13 +1171,49 @@ const animations = {
         z: mesh.position.z 
       };
       
-      new TWEEN.Tween(start)
-        .to(targetPos, duration)
-        .easing(TWEEN.Easing.Sinusoidal.In)
+      // Calculate horizontal distance (ignore y for arc calculation)
+      const distance = Math.sqrt(
+        Math.pow(targetPos.x - start.x, 2) + 
+        Math.pow(targetPos.z - start.z, 2)
+      );
+      
+      // Calculate how many layers we're moving
+      const layerChange = Math.abs(targetPos.y - start.y);
+      
+      // Arc height calculation:
+      // - Horizontal moves: small arc based on distance
+      // - Layer moves: bigger arc, but safe (GAP is 1.5, so max 0.7 keeps us clear)
+      let arcHeight;
+      if (layerChange > 0) {
+        arcHeight = 0.7; // Noticeable arc for layer changes, but won't hit board above
+      } else {
+        arcHeight = Math.min(distance * 0.2, 0.5); // Smaller arc for same-layer moves
+      }
+      
+      // Use a progress variable to control the arc
+      const progress = { t: 0 };
+      
+      new TWEEN.Tween(progress)
+        .to({ t: 1 }, duration)
+        .easing(TWEEN.Easing.Sinusoidal.InOut)
         .onUpdate(() => {
-          mesh.position.set(start.x, start.y, start.z);
+          const t = progress.t;
+          
+          // Linear interpolation for x and z
+          mesh.position.x = start.x + (targetPos.x - start.x) * t;
+          mesh.position.z = start.z + (targetPos.z - start.z) * t;
+          
+          // Parabolic arc for y (creates jump effect)
+          // Arc goes from start.y to target.y with a boost in the middle
+          const heightProgress = Math.sin(t * Math.PI); // 0 -> 1 -> 0
+          const baseY = start.y + (targetPos.y - start.y) * t; // Linear interpolation between layers
+          mesh.position.y = baseY + heightProgress * arcHeight; // Add arc on top
         })
-        .onComplete(() => resolve())
+        .onComplete(() => {
+          // Ensure final position is exact
+          mesh.position.set(targetPos.x, targetPos.y, targetPos.z);
+          resolve();
+        })
         .start();
     });
   },
@@ -1191,6 +1231,43 @@ const animations = {
         .onUpdate(() => {
           mesh.scale.set(start.scale, start.scale, start.scale);
           mesh.position.y = start.y;
+        })
+        .onComplete(() => resolve())
+        .start();
+    });
+  },
+  
+  crownKing(mesh, duration = 600) {
+    return new Promise(resolve => {
+      // Create the crown band
+      const band = new THREE.Mesh(geometries.kingBand, materials.gold);
+      band.rotation.x = Math.PI / 2;
+      
+      // Start above the piece, small scale
+      band.position.y = 0.8;
+      band.scale.set(0.1, 0.1, 0.1);
+      mesh.add(band);
+      mesh.userData.kingBand = band;
+      
+      const start = { 
+        y: 0.8, 
+        scale: 0.1,
+        rotation: 0
+      };
+      
+      const target = { 
+        y: 0.1, 
+        scale: 1,
+        rotation: Math.PI * 2 // Full rotation as it descends
+      };
+      
+      new TWEEN.Tween(start)
+        .to(target, duration)
+        .easing(TWEEN.Easing.Circular.Out) // Adds a nice bounce effect
+        .onUpdate(() => {
+          band.position.y = start.y;
+          band.scale.set(start.scale, start.scale, start.scale);
+          band.rotation.z = start.rotation; // Spin as it falls
         })
         .onComplete(() => resolve())
         .start();
