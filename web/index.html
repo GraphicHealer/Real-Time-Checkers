@@ -989,6 +989,12 @@ const moves = {
     // Move piece
     state.game.board[to.l][to.r][to.c] = piece;
     state.game.board[from.l][from.r][from.c] = null;
+
+    // Play Capture sound effect
+    if (move.captures.length > 0) {
+      dom.sfx.capture.currentTime = 0;
+      dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
+    }
     
     // Remove captured pieces
     move.captures.forEach(cap => {
@@ -1004,16 +1010,7 @@ const moves = {
         });
       }
     });
-    
-    // Play sound effect
-    if (move.captures.length > 0) {
-      dom.sfx.capture.currentTime = 0;
-      dom.sfx.capture.play().catch(e => console.log('Audio play failed:', e));
-    } else {
-      dom.sfx.move.currentTime = 0;
-      dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
-    }
-    
+
     // Update mesh position
     if (mesh) {
       const targetPos = CONFIG.VIEW_MODE === '2D' 
@@ -1033,6 +1030,12 @@ const moves = {
       mesh.userData.boardCoord = { ...to };
       delete state.scene.pieceMeshes[utils.getPieceMeshKey(from.l, from.r, from.c)];
       state.scene.pieceMeshes[utils.getPieceMeshKey(to.l, to.r, to.c)] = mesh;
+    }
+
+    // Play Move sound effect
+    if (move.captures.length <= 0) {
+      dom.sfx.move.currentTime = 0;
+      dom.sfx.move.play().catch(e => console.log('Audio play failed:', e));
     }
 
     visual.clearHighlights();
@@ -1932,3 +1935,4 @@ animate();
 </script>
 </body>
 </html>
+
