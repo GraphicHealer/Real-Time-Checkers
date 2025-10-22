@@ -264,10 +264,11 @@ button:disabled {
 @media (max-width: 700px) {
   #container {
     flex-direction: column;
+    height: 100dvh;
   }
 
   #viewport {
-    height: calc(100vh - 120px);
+    height: calc(100dvh - 120px);
   }
 
   #sidebar {
@@ -281,6 +282,8 @@ button:disabled {
     position: relative;
     z-index: 10;
     height: auto;
+    min-height: fit-content;
+    max-height: 150px;
   }
 
   #sidebar::before {
@@ -493,7 +496,8 @@ const state = {
     lastNewGameReqId: null,
     isRespondingToNewGame: false,
     isAutoResetting: false,
-    keepAliveInterval: null
+    keepAliveInterval: null,
+    connectionTimeout: null
   },
   player: {
     displayName: "",
@@ -504,7 +508,7 @@ const state = {
     pieceMeshes: {},
     outlineMesh: null,
     virtualMoves: [],
-    framePosts: [],  // ADD THIS
+    framePosts: [],
     baseBoard: null
   }
 };
@@ -1669,7 +1673,21 @@ const network = {
     if (state.network.pc) return;
     
     state.network.pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      iceServers: [
+        // Cloudflare - Very reliable
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        // Twilio - Enterprise grade
+        { urls: 'stun:global.stun.twilio.com:3478' },
+        // Metered - Free and reliable
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        // OpenRelay - Open source project
+        { urls: 'stun:openrelay.metered.ca:80' },
+        // Stunprotocol.org - Reference implementation
+        { urls: 'stun:stun.stunprotocol.org:3478' },
+        // L.google as fallback (keep one for compatibility)
+        { urls: 'stun:stun.l.google.com:19302' }
+      ],
+      iceCandidatePoolSize: 10
     });
     
     state.network.pc.onicecandidate = e => {
@@ -1692,14 +1710,40 @@ const network = {
         this.handleConnectionFailure();
       }
     };
-
+    
+    state.network.connectionTimeout = setTimeout(() => {
+      if (state.network.pc.iceConnectionState !== 'connected' && 
+          state.network.pc.iceConnectionState !== 'completed') {
+        console.log('Connection timeout, attempting restart');
+        state.network.pc.restartIce();
+      }
+    }, 10000);
+    
     // Monitor ICE connection state
     state.network.pc.oniceconnectionstatechange = () => {
       console.log('ICE connection state:', state.network.pc.iceConnectionState);
       
+      if (state.network.pc.iceConnectionState === 'connected' || 
+          state.network.pc.iceConnectionState === 'completed') {
+        if (state.network.connectionTimeout) {
+          clearTimeout(state.network.connectionTimeout);
+          state.network.connectionTimeout = null;
+        }
+      }
+      
       if (state.network.pc.iceConnectionState === 'failed') {
         console.log('ICE connection failed, restarting...');
         state.network.pc.restartIce();
+      }
+      
+      if (state.network.pc.iceConnectionState === 'disconnected') {
+        console.log('ICE disconnected, waiting for reconnection...');
+        setTimeout(() => {
+          if (state.network.pc.iceConnectionState === 'disconnected') {
+            console.log('Still disconnected, restarting ICE');
+            state.network.pc.restartIce();
+          }
+        }, 5000);
       }
     };
     
@@ -1751,13 +1795,28 @@ const network = {
   },
   
   handleConnectionFailure() {
-    if (state.game.isMultiplayer) {
-      utils.showModal('disconnected');
+    console.log('Connection failure detected');
+    
+    // Don't show disconnect modal immediately - try to reconnect first
+    if (state.game.isMultiplayer && state.network.pc) {
+      console.log('Attempting to restart ICE...');
+      state.network.pc.restartIce();
+      
+      // Wait 5 seconds to see if reconnection works
       setTimeout(() => {
-        utils.showModal('startup');
-        dom.undoBtn.style.display = 'block';
-        state.game.isMultiplayer = false;
-        game.reset();
+        if (state.network.pc && 
+            state.network.pc.connectionState !== 'connected' &&
+            state.network.dataChannelReady === false) {
+          // Reconnection failed, show disconnect modal
+          utils.showModal('disconnected');
+          setTimeout(() => {
+            utils.showModal('startup');
+            dom.undoBtn.style.display = 'block';
+            state.game.isMultiplayer = false;
+            this.cleanup();
+            game.reset();
+          }, 5000);
+        }
       }, 5000);
     }
   },
@@ -1821,6 +1880,11 @@ const network = {
   
   cleanup() {
     this.stopKeepAlive();
+    
+    if (state.network.connectionTimeout) {
+      clearTimeout(state.network.connectionTimeout);
+      state.network.connectionTimeout = null;
+    }
     
     if (state.network.dataChannel) {
       state.network.dataChannel.close();
@@ -2189,4 +2253,3 @@ animate();
 </script>
 </body>
 </html>
-
