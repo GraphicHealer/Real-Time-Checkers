@@ -169,7 +169,8 @@ button:disabled {
 }
 
 #helpButton,
-#viewToggle {
+#viewToggle,
+#muteButton {
   position: absolute;
   bottom: 20px;
   width: 50px;
@@ -196,11 +197,49 @@ button:disabled {
   right: 20px;
 }
 
+#muteButton {
+  right: 90px;
+}
+
 #helpButton:hover,
-#viewToggle:hover {
+#viewToggle:hover,
+#muteButton:hover {
   background: #357abd;
   transform: scale(1.1);
 }
+
+#signalIndicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#signalIndicator.visible {
+  opacity: 1;
+}
+
+#signalIndicator .bar {
+  fill: #333;
+  transition: fill 0.3s;
+}
+
+#signalIndicator.excellent .bar { fill: #2ecc71; }
+#signalIndicator.good .bar1,
+#signalIndicator.good .bar2,
+#signalIndicator.good .bar3 { fill: #f39c12; }
+#signalIndicator.poor .bar1 { fill: #e74c3c; }
 
 .help-overlay {
   position: fixed;
@@ -332,7 +371,9 @@ button:disabled {
   }
 
   #helpButton,
-  #viewToggle {
+  #viewToggle,
+  #muteButton,
+  #signalIndicator {
     bottom: 10px;
     width: 45px;
     height: 45px;
@@ -345,6 +386,21 @@ button:disabled {
 
   #viewToggle {
     right: 10px;
+  }
+
+  #muteButton {
+    right: 65px;
+    bottom: 10px;
+  }
+
+  #signalIndicator {
+    right: 0px;
+    top: 0px;
+  }
+  
+  #signalIndicator svg {
+    width: 24px;
+    height: 24px;
   }
 }
 </style>
@@ -365,6 +421,26 @@ button:disabled {
         <circle cx="12" cy="12" r="3"></circle>
       </svg>
     </button>
+    <button id="muteButton" title="Toggle Mute">
+      <svg id="unmutedIcon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      </svg>
+      <svg id="mutedIcon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <line x1="23" y1="9" x2="17" y2="15"></line>
+        <line x1="17" y1="9" x2="23" y2="15"></line>
+      </svg>
+    </button>
+
+    <div id="signalIndicator" title="Connection Quality">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="none">
+        <rect class="bar bar1" x="2" y="17" width="3" height="5" rx="1"/>
+        <rect class="bar bar2" x="7" y="13" width="3" height="9" rx="1"/>
+        <rect class="bar bar3" x="12" y="9" width="3" height="13" rx="1"/>
+        <rect class="bar bar4" x="17" y="5" width="3" height="17" rx="1"/>
+      </svg>
+    </div>
   </div>
   <div id="sidebar">
     <h2>3D Checkers</h2>
@@ -510,6 +586,9 @@ const state = {
     virtualMoves: [],
     framePosts: [],
     baseBoard: null
+  },
+  audio: {
+    muted: false
   }
 };
 
@@ -552,6 +631,10 @@ const dom = {
   helpOverlay: document.getElementById('helpOverlay'),
   helpClose: document.getElementById('helpClose'),
   viewToggle: document.getElementById('viewToggle'),
+  muteButton: document.getElementById('muteButton'),
+  unmutedIcon: document.getElementById('unmutedIcon'),
+  mutedIcon: document.getElementById('mutedIcon'),
+  signalIndicator: document.getElementById('signalIndicator'),
   desktopControls: document.getElementById('desktopControls'),
   mobileControls: document.getElementById('mobileControls'),
   
@@ -1722,6 +1805,7 @@ const network = {
     // Monitor ICE connection state
     state.network.pc.oniceconnectionstatechange = () => {
       console.log('ICE connection state:', state.network.pc.iceConnectionState);
+      network.updateSignalIndicator();
       
       if (state.network.pc.iceConnectionState === 'connected' || 
           state.network.pc.iceConnectionState === 'completed') {
@@ -1904,6 +1988,7 @@ const network = {
     state.network.dataChannelReady = false;
     state.network.dataChannelQueue = [];
     state.network.pendingIceCandidates = [];
+    dom.signalIndicator.classList.remove('visible');
   },
 
   sendDataChannel(payload) {
@@ -1926,6 +2011,29 @@ const network = {
 
   sendWin(winner) {
     this.sendDataChannel({ type: 'win', winner });
+  },
+  
+  updateSignalIndicator() {
+    if (!state.game.isMultiplayer || !state.network.pc) {
+      dom.signalIndicator.classList.remove('visible');
+      return;
+    }
+    
+    dom.signalIndicator.classList.add('visible');
+    
+    const iceState = state.network.pc.iceConnectionState;
+    dom.signalIndicator.classList.remove('excellent', 'good', 'poor');
+    
+    if (iceState === 'connected' || iceState === 'completed') {
+      dom.signalIndicator.classList.add('excellent');
+      dom.signalIndicator.title = 'Connection: Excellent';
+    } else if (iceState === 'checking' || iceState === 'new') {
+      dom.signalIndicator.classList.add('good');
+      dom.signalIndicator.title = 'Connection: Connecting...';
+    } else {
+      dom.signalIndicator.classList.add('poor');
+      dom.signalIndicator.title = 'Connection: Poor';
+    }
   },
   
   requestNewGame(button = dom.newGameBtn) {
@@ -2202,6 +2310,18 @@ dom.viewToggle.addEventListener('click', () => {
   }
   board.updateBoardLayout();
   visual.clearHighlights();
+});
+
+// Mute toggle
+dom.muteButton.addEventListener('click', () => {
+  state.audio.muted = !state.audio.muted;
+  dom.unmutedIcon.style.display = state.audio.muted ? 'none' : 'block';
+  dom.mutedIcon.style.display = state.audio.muted ? 'block' : 'none';
+  
+  // Mute all audio elements
+  Object.values(dom.sfx).forEach(sfx => {
+    sfx.muted = state.audio.muted;
+  });
 });
 
 // ==================== AUTO-JOIN IF ?room=XYZ IN URL ====================
